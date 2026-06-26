@@ -1,0 +1,18 @@
+# Python cached files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Databases & local files
+*.db
+*.log
+.env
+
+# IDE configurations
+.idea/
+.vscode/
+venv/
+.venv/
+env/
