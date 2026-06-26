@@ -16,3 +16,15 @@ __pycache__/
 venv/
 .venv/
 env/
+
+# PyInstaller / Packaging
+build/
+dist/
+*.spec
+
+# Local configurations
+*.env
+*.db-journal
+*.db-wal
+*.db-shm
+

@@ -1,4 +1,5 @@
 import os
+import sys
 import threading
 import yaml
 from fastapi import FastAPI, Depends, HTTPException, status
@@ -12,18 +13,42 @@ from src.scheduler import TenderBotOrchestrator
 
 app = FastAPI(title="Tender Tracker API", version="1.0.0")
 
-# Gerekli dizinleri ve static yapıyı oluştur
-os.makedirs("static", exist_ok=True)
-os.makedirs("static/css", exist_ok=True)
-os.makedirs("static/js", exist_ok=True)
+def get_resource_path(relative_path):
+    """PyInstaller geçici klasöründeki veya çalışma dizinindeki dosya yolunu çözümler."""
+    try:
+        base_path = sys._MEIPASS
+    except AttributeError:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
+static_dir = get_resource_path("static")
+
+# Geliştirme modunda static klasörü oluşturulabilir
+if not getattr(sys, 'frozen', False):
+    os.makedirs(static_dir, exist_ok=True)
+    os.makedirs(os.path.join(static_dir, "css"), exist_ok=True)
+    os.makedirs(os.path.join(static_dir, "js"), exist_ok=True)
+
+# Varsayılan konfigürasyon dosyalarını kopyala (yerelde yoksa)
+for filename in ["config.yaml", "sectors.yaml"]:
+    if not os.path.exists(filename):
+        src_path = get_resource_path(filename)
+        if os.path.exists(src_path):
+            try:
+                import shutil
+                shutil.copy(src_path, filename)
+                print(f"Varsayılan {filename} kopyalandı.")
+            except Exception as e:
+                print(f"{filename} kopyalanırken hata: {e}")
 
 # Static dosyaları yönlendir
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 @app.get("/")
 def index():
-    if os.path.exists("static/index.html"):
-        return FileResponse("static/index.html")
+    index_path = os.path.join(static_dir, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
     return {"message": "Arayüz dosyaları bulunamadı. Lütfen static/index.html'i yükleyin."}
 
 # =========================================================
@@ -167,3 +192,24 @@ def get_logs(current_user: User = Depends(get_current_user)):
 
 # Veritabanını uygulama başlarken hazırla
 init_db()
+
+if __name__ == "__main__":
+    import uvicorn
+    import webbrowser
+    import time
+    
+    port = int(os.getenv("PORT", 8000))
+    host = os.getenv("HOST", "127.0.0.1")
+    
+    def open_browser():
+        time.sleep(1.5)
+        try:
+            webbrowser.open(f"http://{host}:{port}/")
+        except Exception as e:
+            print(f"Tarayıcı açılırken hata oluştu: {e}")
+            
+    threading.Thread(target=open_browser, daemon=True).start()
+    
+    print(f"Sunucu başlatılıyor: http://{host}:{port}/")
+    uvicorn.run(app, host=host, port=port)
+

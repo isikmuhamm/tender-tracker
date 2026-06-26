@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>İhale Takip Dashboard</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="static/css/style.css">
+</head>
+<body>
+
+    <!-- =========================================================
+         LOGIN CONTAINER
+         ========================================================= -->
+    <div id="login-container" class="glass-card">
+        <h2><i class="fa-solid fa-bell"></i> İhale Takip Botu</h2>
+        <p>Devam etmek için giriş yapın.</p>
+        <div id="login-error" class="error-msg d-none">Kullanıcı adı veya şifre hatalı!</div>
+        <form id="login-form">
+            <div class="input-group">
+                <i class="fa-solid fa-user"></i>
+                <input type="text" id="username" placeholder="Kullanıcı Adı" required autocomplete="username">
+            </div>
+            <div class="input-group">
+                <i class="fa-solid fa-lock"></i>
+                <input type="password" id="password" placeholder="Şifre" required autocomplete="current-password">
+            </div>
+            <button type="submit" class="btn-primary">Giriş Yap</button>
+        </form>
+    </div>
+
+    <!-- =========================================================
+         MAIN APPLICATION CONTAINER
+         ========================================================= -->
+    <div id="app-container" class="d-none">
+        <!-- Sidebar -->
+        <aside id="sidebar">
+            <div class="brand">
+                <i class="fa-solid fa-tower-broadcast"></i>
+                <span>Tender Tracker</span>
+            </div>
+            <nav>
+                <a href="#" class="nav-item active" data-target="panel-tenders">
+                    <i class="fa-solid fa-file-invoice-dollar"></i> İhaleler
+                </a>
+                <a href="#" class="nav-item" data-target="panel-config">
+                    <i class="fa-solid fa-sliders"></i> Yapılandırma
+                </a>
+                <a href="#" class="nav-item" data-target="panel-logs">
+                    <i class="fa-solid fa-terminal"></i> Sistem Logları
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <button id="btn-logout" class="btn-logout">
+                    <i class="fa-solid fa-arrow-right-from-bracket"></i> Çıkış Yap
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main id="main-content">
+            <!-- Header -->
+            <header>
+                <div class="page-title">
+                    <h1 id="header-title">Aktif İhaleler</h1>
+                </div>
+                <div class="header-actions">
+                    <button id="btn-trigger" class="btn-secondary">
+                        <i class="fa-solid fa-sync" id="sync-icon"></i> Taramayı Tetikle
+                    </button>
+                </div>
+            </header>
+
+            <!-- =========================================================
+                 PANEL: TENDERS
+                 ========================================================= -->
+            <section id="panel-tenders" class="panel-section">
+                <!-- Filters -->
+                <div class="filters-bar glass-card">
+                    <div class="filter-group">
+                        <label for="filter-sector">Sektör</label>
+                        <select id="filter-sector">
+                            <option value="">Tümü</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="filter-source">Kaynak</label>
+                        <select id="filter-source">
+                            <option value="">Tümü</option>
+                            <option value="yatirimlar">Yatırımlar Dergisi</option>
+                            <option value="dmo">DMO</option>
+                            <option value="ilan_gov_tr">ilan.gov.tr</option>
+                        </select>
+                    </div>
+                    <div class="filter-group search-group">
+                        <label for="search-input">Ara</label>
+                        <input type="text" id="search-input" placeholder="İhale adı veya detay ara...">
+                    </div>
+                </div>
+
+                <!-- Tenders List -->
+                <div id="tenders-list-container">
+                    <div class="tender-stats">
+                        <span>Toplam: <strong id="tender-count">0</strong> aktif ihale listelendi.</span>
+                    </div>
+                    <div id="tenders-grid">
+                        <!-- Dynamic tender cards will be inserted here -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- =========================================================
+                 PANEL: CONFIGURATION
+                 ========================================================= -->
+            <section id="panel-config" class="panel-section d-none">
+                <div class="config-container">
+                    <div id="config-alert" class="alert-msg d-none"></div>
+                    <div class="config-editors">
+                        <!-- General Config YAML -->
+                        <div class="editor-box glass-card">
+                            <h3><i class="fa-solid fa-gear"></i> Genel Ayarlar (config.yaml)</h3>
+                            <textarea id="editor-config" spellcheck="false" placeholder="Yükleniyor..."></textarea>
+                        </div>
+                        
+                        <!-- Sectors YAML -->
+                        <div class="editor-box glass-card">
+                            <h3><i class="fa-solid fa-tags"></i> Sektörler & Kelimeler (sectors.yaml)</h3>
+                            <textarea id="editor-sectors" spellcheck="false" placeholder="Yükleniyor..."></textarea>
+                        </div>
+                    </div>
+                    <div class="config-actions">
+                        <button id="btn-save-config" class="btn-primary">
+                            <i class="fa-solid fa-floppy-disk"></i> Değişiklikleri Kaydet
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- =========================================================
+                 PANEL: LOGS
+                 ========================================================= -->
+            <section id="panel-logs" class="panel-section d-none">
+                <div class="logs-container glass-card">
+                    <div class="logs-header">
+                        <h3><i class="fa-solid fa-code"></i> Olay Günlüğü (events.log)</h3>
+                        <button id="btn-refresh-logs" class="btn-small"><i class="fa-solid fa-arrows-rotate"></i> Yenile</button>
+                    </div>
+                    <pre id="logs-viewer">Loglar yükleniyor...</pre>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="d-none"></div>
+
+    <!-- Custom JS -->
+    <script src="static/js/app.js"></script>
+</body>
+</html>

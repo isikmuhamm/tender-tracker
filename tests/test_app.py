@@ -82,3 +82,96 @@ def test_tenders_endpoint_authorized(client):
     data = response.json()
     assert "total" in data
     assert "items" in data
+
+from unittest.mock import patch, mock_open
+
+def test_get_config_authorized(client):
+    login_resp = client.post(
+        "/api/auth/login",
+        data={"username": "admin", "password": "admin"}
+    )
+    token = login_resp.json()["access_token"]
+    
+    with patch("os.path.exists", return_value=True), \
+         patch("builtins.open", mock_open(read_data="dummy: yaml_content")):
+        response = client.get(
+            "/api/config",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert "config_yaml" in data
+        assert "sectors_yaml" in data
+        assert data["config_yaml"] == "dummy: yaml_content"
+        assert data["sectors_yaml"] == "dummy: yaml_content"
+
+def test_save_config_authorized(client):
+    login_resp = client.post(
+        "/api/auth/login",
+        data={"username": "admin", "password": "admin"}
+    )
+    token = login_resp.json()["access_token"]
+    
+    m = mock_open()
+    with patch("builtins.open", m):
+        response = client.post(
+            "/api/config",
+            json={"config_yaml": "dummy: new_config", "sectors_yaml": "dummy: new_sectors"},
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert m.call_count == 2
+
+def test_save_config_invalid_yaml(client):
+    login_resp = client.post(
+        "/api/auth/login",
+        data={"username": "admin", "password": "admin"}
+    )
+    token = login_resp.json()["access_token"]
+    
+    response = client.post(
+        "/api/config",
+        json={"config_yaml": "invalid: - yaml : [}"},
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 400
+    assert "Geçersiz YAML formatı" in response.json()["detail"]
+
+def test_get_logs(client):
+    login_resp = client.post(
+        "/api/auth/login",
+        data={"username": "admin", "password": "admin"}
+    )
+    token = login_resp.json()["access_token"]
+    
+    with patch("os.path.exists", return_value=True), \
+         patch("builtins.open", mock_open(read_data="line 1\nline 2\n")):
+        response = client.get(
+            "/api/logs",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert "logs" in data
+        assert "line 1" in data["logs"]
+
+def test_trigger_scraper(client):
+    login_resp = client.post(
+        "/api/auth/login",
+        data={"username": "admin", "password": "admin"}
+    )
+    token = login_resp.json()["access_token"]
+    
+    with patch("src.scheduler.TenderBotOrchestrator.run_once") as mock_run_once:
+        response = client.post(
+            "/api/tenders/trigger",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        assert response.status_code == 200
+        assert response.json()["success"] is True
+        import time
+        time.sleep(0.2)
+        mock_run_once.assert_called_once()
+
