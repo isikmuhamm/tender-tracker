@@ -28,3 +28,6 @@ dist/
 *.db-wal
 *.db-shm
 
+# Backups of legacy files
+backup/
+
