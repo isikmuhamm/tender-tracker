@@ -1,0 +1,52 @@
+# sectors.yaml
+# Sektör tanımları ve yerel kural tabanlı sınıflandırma için anahtar kelimeler
+
+Demiryolu:
+  keywords:
+    - "tcdd"
+    - "demiryolu"
+    - "demir yolu"
+    - "raylı"
+    - "raylı sistem"
+    - "sinyalizasyon"
+    - "elektrifikasyon"
+    - "katener"
+    - "makas"
+    - "tren"
+    - "yht"
+    - "metro"
+    - "tramvay"
+    - "istasyon"
+    - "depo sahası"
+  negative_keywords:
+    - "oyuncak"
+    - "maket"
+
+Su Arıtma:
+  keywords:
+    - "su arıtma"
+    - "arıtma tesisi"
+    - "atıksu"
+    - "atık su"
+    - "deşarj"
+    - "kanalizasyon"
+    - "filtrasyon"
+    - "membran"
+    - "klorlama"
+  negative_keywords:
+    - "damacana"
+    - "pet şişe"
+
+İnşaat:
+  keywords:
+    - "inşaat"
+    - "yapım işi"
+    - "üst yapı"
+    - "altyapı"
+    - "alt yapı"
+    - "bina"
+    - "restorasyon"
+    - "tadilat"
+    - "çevre düzenlemesi"
+  negative_keywords:
+    - "kitap alımı"

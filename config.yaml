@@ -1,0 +1,23 @@
+# config.yaml
+# İhale Takip Botu Genel Yapılandırma Dosyası
+
+settings:
+  # Tarama sıklığı (dakika cinsinden, run.py daemon modunda çalışırken kullanılır)
+  check_interval: 60
+  
+  # Aktif edilecek kazıcılar
+  enabled_scrapers:
+    - "yatirimlar"
+    - "dmo"
+    - "ilan_gov_tr"
+    - "ekapv2"
+
+# Sektör dışı, tüm ihalelerde geçerli küresel filtreler
+global_filters:
+  # İçinde bu kelimeler geçen ihaleler doğrudan elenecektir (örnek: satış ilanları)
+  exclude_keywords:
+    - "satılık"
+    - "kiralık"
+    - "arsa satışı"
+    - "konut satışı"
+    - "hizmet aracı kiralama"
