@@ -10,11 +10,31 @@ class TelegramNotifier(BaseNotifier):
     """
     İhaleleri Telegram Bot API üzerinden bir kanal veya gruba gönderen sınıf.
     """
-    def __init__(self):
+    def __init__(self, config_path: str = None):
         super().__init__(name="telegram")
-        self.bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
-        self.chat_id = os.getenv("TELEGRAM_CHAT_ID")
-        self.api_url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage" if self.bot_token else None
+        from src.database import get_data_path
+        self.config_path = config_path or get_data_path("config.yaml")
+        self.bot_token = None
+        self.chat_id = None
+        self.api_url = None
+        
+        self.load_config()
+
+    def load_config(self):
+        import yaml
+        if not os.path.exists(self.config_path):
+            return
+        try:
+            with open(self.config_path, "r", encoding="utf-8") as f:
+                config = yaml.safe_load(f)
+                if config and "notifications" in config and "telegram" in config["notifications"]:
+                    tg_cfg = config["notifications"]["telegram"]
+                    self.bot_token = tg_cfg.get("bot_token")
+                    self.chat_id = tg_cfg.get("chat_id")
+                    if self.bot_token:
+                        self.api_url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
+        except Exception as e:
+            logger.error(f"Telegram bildirim yapılandırması yüklenirken hata: {e}")
 
     def _send_raw_message(self, text: str) -> bool:
         """Telegram API'sine ham mesaj gönderir."""

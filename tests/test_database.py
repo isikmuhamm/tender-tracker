@@ -52,8 +52,8 @@ def test_create_user(db_session):
     assert db_user.created_at is not None
 
 @patch("src.database.SessionLocal")
-def test_init_db_creates_default_admin(mock_session_class):
-    """init_db fonksiyonunun ilk çalıştırmada varsayılan admin kullanıcısını oluşturduğunu test eder."""
+def test_init_db_does_not_create_default_admin(mock_session_class):
+    """init_db fonksiyonunun artık otomatik admin kullanıcısı oluşturmadığını test eder."""
     # Test için geçici veritabanı
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(bind=engine)
@@ -67,10 +67,7 @@ def test_init_db_creates_default_admin(mock_session_class):
     with patch("src.database.engine", engine), patch("src.database.DATABASE_URL", "sqlite:///:memory:"):
         init_db()
         
-    # Varsayılan kullanıcının eklendiğini doğrula
-    admin = session.query(User).filter_by(username="admin").first()
-    assert admin is not None
-    
-    import bcrypt
-    assert bcrypt.checkpw(b"admin", admin.password_hash.encode("utf-8")) is True
+    # Kullanıcı kaydı olmadığını doğrula
+    users = session.query(User).all()
+    assert len(users) == 0
 

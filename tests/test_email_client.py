@@ -1,23 +1,33 @@
 import pytest
+import yaml
 from unittest.mock import MagicMock, patch
 from src.notifier.email_client import EmailNotifier
 
 @pytest.fixture
-def mock_env(monkeypatch):
-    monkeypatch.setenv("SMTP_HOST", "smtp.test.com")
-    monkeypatch.setenv("SMTP_PORT", "587")
-    monkeypatch.setenv("SMTP_USE_TLS", "true")
-    monkeypatch.setenv("MAIL_FROM", "sender@test.com")
-    monkeypatch.setenv("MAIL_PASSWORD", "testpass")
-    monkeypatch.setenv("MAIL_TO", "rcpt1@test.com,rcpt2@test.com")
+def temp_config_file(tmp_path):
+    config_data = {
+        "notifications": {
+            "email": {
+                "smtp_server": "smtp.test.com",
+                "smtp_port": 587,
+                "sender": "sender@test.com",
+                "password": "testpass",
+                "recipients": ["rcpt1@test.com", "rcpt2@test.com"]
+            }
+        }
+    }
+    cfg_file = tmp_path / "config.yaml"
+    with open(cfg_file, "w", encoding="utf-8") as f:
+        yaml.safe_dump(config_data, f)
+    return str(cfg_file)
 
 @patch("smtplib.SMTP")
-def test_email_notifier_send(mock_smtp_class, mock_env):
+def test_email_notifier_send(mock_smtp_class, temp_config_file):
     # SMTP mock nesnelerini ayarla
     mock_smtp = MagicMock()
     mock_smtp_class.return_value.__enter__.return_value = mock_smtp
     
-    notifier = EmailNotifier()
+    notifier = EmailNotifier(config_path=temp_config_file)
     
     tenders = [
         {
@@ -52,8 +62,8 @@ def test_email_notifier_send(mock_smtp_class, mock_env):
     assert sent_msg["To"] == "rcpt1@test.com, rcpt2@test.com"
     assert "İhale Raporu" in sent_msg["Subject"]
 
-def test_email_notifier_empty_tenders(mock_env):
-    notifier = EmailNotifier()
+def test_email_notifier_empty_tenders(temp_config_file):
+    notifier = EmailNotifier(config_path=temp_config_file)
     # Boş ihale listesi gönderildiğinde SMTP çağrılmadan doğrudan True dönmeli
     with patch("smtplib.SMTP") as mock_smtp_class:
         success = notifier.send_notification([])

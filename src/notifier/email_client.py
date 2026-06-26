@@ -13,14 +13,41 @@ class EmailNotifier(BaseNotifier):
     """
     İhaleleri SMTP sunucusu üzerinden e-posta olarak gönderen sınıf.
     """
-    def __init__(self):
+    def __init__(self, config_path: str = None):
         super().__init__(name="email")
-        self.smtp_host = os.getenv("SMTP_HOST")
-        self.smtp_port = int(os.getenv("SMTP_PORT", 587))
-        self.smtp_use_tls = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
-        self.mail_from = os.getenv("MAIL_FROM")
-        self.mail_password = os.getenv("MAIL_PASSWORD")
-        self.mail_to = [m.strip() for m in os.getenv("MAIL_TO", "").split(",") if m.strip()]
+        from src.database import get_data_path
+        self.config_path = config_path or get_data_path("config.yaml")
+        self.smtp_host = None
+        self.smtp_port = 587
+        self.smtp_use_tls = True
+        self.mail_from = None
+        self.mail_password = None
+        self.mail_to = []
+        
+        self.load_config()
+
+    def load_config(self):
+        import yaml
+        if not os.path.exists(self.config_path):
+            return
+        try:
+            with open(self.config_path, "r", encoding="utf-8") as f:
+                config = yaml.safe_load(f)
+                if config and "notifications" in config and "email" in config["notifications"]:
+                    mail_cfg = config["notifications"]["email"]
+                    self.smtp_host = mail_cfg.get("smtp_server")
+                    self.smtp_port = int(mail_cfg.get("smtp_port", 587))
+                    self.smtp_use_tls = True
+                    self.mail_from = mail_cfg.get("sender")
+                    self.mail_password = mail_cfg.get("password")
+                    # handle string or list format for recipients
+                    recipients = mail_cfg.get("recipients", [])
+                    if isinstance(recipients, str):
+                        self.mail_to = [m.strip() for m in recipients.split(",") if m.strip()]
+                    else:
+                        self.mail_to = [m.strip() for m in recipients if m.strip()]
+        except Exception as e:
+            logger.error(f"E-posta bildirim yapılandırması yüklenirken hata: {e}")
 
     def send_notification(self, tenders: List[Dict[str, Any]]) -> bool:
         if not tenders:

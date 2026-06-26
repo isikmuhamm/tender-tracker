@@ -2,12 +2,16 @@ import argparse
 import sys
 import time
 import logging
+import urllib3
 from dotenv import load_dotenv
 from src.scheduler import TenderBotOrchestrator
-from src.database import init_db, SessionLocal, Tender
+from src.database import init_db, SessionLocal, Tender, get_data_path
 
 # Çevresel değişkenleri yükle
 load_dotenv()
+
+# Urllib3 HTTPS sertifika uyarılarını kapat
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # =========================================================
 # LOGGING SETUP
@@ -21,7 +25,7 @@ console_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(
 logger.addHandler(console_handler)
 
 # Dosya handler (Özet loglar)
-file_handler = logging.FileHandler("events.log", encoding="utf-8")
+file_handler = logging.FileHandler(get_data_path("events.log"), encoding="utf-8")
 file_handler.setFormatter(logging.Formatter('%(asctime)s - %(message)s'))
 file_handler.setLevel(logging.INFO)
 logger.addHandler(file_handler)

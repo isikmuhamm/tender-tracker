@@ -25,7 +25,7 @@ class IlanGovTrScraper(BaseScraper):
             "maxResultCount": 30
         }
         try:
-            r = requests.post(self.url, json=payload, headers=self.headers, timeout=20)
+            r = requests.post(self.url, json=payload, headers=self.headers, timeout=20, verify=False)
             r.raise_for_status()
             return r.json()
         except Exception as e:

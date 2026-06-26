@@ -1,20 +1,31 @@
 import pytest
+import yaml
 from unittest.mock import patch, MagicMock
 from src.notifier.telegram_bot import TelegramNotifier
 
 @pytest.fixture
-def mock_tg_env(monkeypatch):
-    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "123456:ABC-DEF")
-    monkeypatch.setenv("TELEGRAM_CHAT_ID", "@my_channel")
+def temp_tg_config(tmp_path):
+    config_data = {
+        "notifications": {
+            "telegram": {
+                "bot_token": "123456:ABC-DEF",
+                "chat_id": "@my_channel"
+            }
+        }
+    }
+    cfg_file = tmp_path / "config.yaml"
+    with open(cfg_file, "w", encoding="utf-8") as f:
+        yaml.safe_dump(config_data, f)
+    return str(cfg_file)
 
 @patch("requests.post")
-def test_telegram_notifier_send(mock_post, mock_tg_env):
+def test_telegram_notifier_send(mock_post, temp_tg_config):
     # Mock response
     mock_resp = MagicMock()
     mock_resp.status_code = 200
     mock_post.return_value = mock_resp
     
-    notifier = TelegramNotifier()
+    notifier = TelegramNotifier(config_path=temp_tg_config)
     
     tenders = [
         {
@@ -42,12 +53,12 @@ def test_telegram_notifier_send(mock_post, mock_tg_env):
     assert "https://example.com/t1" in payload["text"]
 
 @patch("requests.post")
-def test_telegram_notifier_message_splitting(mock_post, mock_tg_env):
+def test_telegram_notifier_message_splitting(mock_post, temp_tg_config):
     mock_resp = MagicMock()
     mock_resp.status_code = 200
     mock_post.return_value = mock_resp
     
-    notifier = TelegramNotifier()
+    notifier = TelegramNotifier(config_path=temp_tg_config)
     
     # 4000 karakteri aşacak sayıda büyük ihale ekleyelim
     tenders = []

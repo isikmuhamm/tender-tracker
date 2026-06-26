@@ -100,10 +100,10 @@ def test_get_config_authorized(client):
         )
         assert response.status_code == 200
         data = response.json()
-        assert "config_yaml" in data
-        assert "sectors_yaml" in data
-        assert data["config_yaml"] == "dummy: yaml_content"
-        assert data["sectors_yaml"] == "dummy: yaml_content"
+        assert "config" in data
+        assert "sectors" in data
+        assert data["config"] == {"dummy": "yaml_content"}
+        assert data["sectors"] == {"dummy": "yaml_content"}
 
 def test_save_config_authorized(client):
     login_resp = client.post(
@@ -116,7 +116,7 @@ def test_save_config_authorized(client):
     with patch("builtins.open", m):
         response = client.post(
             "/api/config",
-            json={"config_yaml": "dummy: new_config", "sectors_yaml": "dummy: new_sectors"},
+            json={"config": {"dummy": "new_config"}, "sectors": {"dummy": "new_sectors"}},
             headers={"Authorization": f"Bearer {token}"}
         )
         assert response.status_code == 200
@@ -124,7 +124,7 @@ def test_save_config_authorized(client):
         assert data["success"] is True
         assert m.call_count == 2
 
-def test_save_config_invalid_yaml(client):
+def test_save_config_invalid_json(client):
     login_resp = client.post(
         "/api/auth/login",
         data={"username": "admin", "password": "admin"}
@@ -133,11 +133,10 @@ def test_save_config_invalid_yaml(client):
     
     response = client.post(
         "/api/config",
-        json={"config_yaml": "invalid: - yaml : [}"},
-        headers={"Authorization": f"Bearer {token}"}
+        content="invalid json {",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     )
-    assert response.status_code == 400
-    assert "Geçersiz YAML formatı" in response.json()["detail"]
+    assert response.status_code in (400, 422)
 
 def test_get_logs(client):
     login_resp = client.post(

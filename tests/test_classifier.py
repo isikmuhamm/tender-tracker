@@ -60,3 +60,46 @@ def test_local_classification_insufficient_score(temp_sectors_file):
     sector, method = tc.classify("Genel İhale İlanı", "Bu projede tren kullanılabilir.")
     assert sector is None
     assert method == "none"
+
+def test_evaluate_custom_filters_success(temp_sectors_file):
+    from unittest.mock import patch
+    with patch("src.classifier.LLMClient") as MockLLM:
+        mock_instance = MockLLM.return_value
+        mock_instance.is_enabled.return_value = True
+        mock_instance.complete.return_value = '{"matched_filter_ids": ["filter_1"]}'
+        
+        tc = TenderClassifier(sectors_path=temp_sectors_file)
+        custom_filters = [
+            {"id": "filter_1", "name": "Boji Alımı", "prompt_instruction": "Boji veya tekerlek seti alımı içeriyor mu?", "enabled": True},
+            {"id": "filter_2", "name": "Yazılım", "prompt_instruction": "Web tabanlı yazılım geliştirme mi?", "enabled": True},
+            {"id": "filter_3", "name": "Pasif Filtre", "prompt_instruction": "Devre dışı bırakılmış filtre", "enabled": False}
+        ]
+        
+        matched_ids = tc.evaluate_custom_filters(
+            title="Boji ve Tekerlek Seti İhalesi",
+            summary="Hızlı trenler için boji alımı yapılacaktır.",
+            custom_filters=custom_filters
+        )
+        
+        assert matched_ids == ["filter_1"]
+        mock_instance.complete.assert_called_once()
+        called_prompt = mock_instance.complete.call_args[0][0]
+        assert "Boji ve Tekerlek Seti İhalesi" in called_prompt
+        assert "filter_1" in called_prompt
+        assert "filter_2" in called_prompt
+        assert "filter_3" not in called_prompt
+
+def test_evaluate_custom_filters_invalid_id(temp_sectors_file):
+    from unittest.mock import patch
+    with patch("src.classifier.LLMClient") as MockLLM:
+        mock_instance = MockLLM.return_value
+        mock_instance.is_enabled.return_value = True
+        mock_instance.complete.return_value = '{"matched_filter_ids": ["invalid_filter_id"]}'
+        
+        tc = TenderClassifier(sectors_path=temp_sectors_file)
+        custom_filters = [
+            {"id": "filter_1", "name": "Boji Alımı", "prompt_instruction": "Boji...", "enabled": True}
+        ]
+        
+        matched_ids = tc.evaluate_custom_filters("title", "summary", custom_filters)
+        assert matched_ids == []

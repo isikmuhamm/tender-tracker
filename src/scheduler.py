@@ -19,8 +19,9 @@ class TenderBotOrchestrator:
     Tüm kazıyıcı, filtreleyici, sınıflandırıcı ve bildirim modüllerini
     yöneten ve koordine eden ana orkestrasyon sınıfı.
     """
-    def __init__(self, config_path: str = "config.yaml"):
-        self.config_path = config_path
+    def __init__(self, config_path: str = None):
+        from src.database import get_data_path
+        self.config_path = config_path or get_data_path("config.yaml")
         self.scrapers = []
         self.filter = TenderFilter(config_path=config_path)
         self.classifier = TenderClassifier()
@@ -63,6 +64,19 @@ class TenderBotOrchestrator:
         init_db()
         db: Session = SessionLocal()
         
+        # Sınıflandırıcı ayarlarını (API key vb.) ve özel süzgeçleri en güncel halinden yükle
+        self.classifier = TenderClassifier()
+        
+        custom_filters = []
+        if os.path.exists(self.config_path):
+            try:
+                with open(self.config_path, "r", encoding="utf-8") as f:
+                    config = yaml.safe_load(f)
+                    if config and "filters" in config:
+                        custom_filters = config["filters"].get("custom_llm_filters", [])
+            except Exception as e:
+                logger.error(f"Yapılandırmadan akıllı süzgeçler yüklenirken hata: {e}")
+
         new_tenders_added = []
         
         try:
@@ -98,6 +112,16 @@ class TenderBotOrchestrator:
                         # Sektörel Sınıflandırma
                         sector, method = self.classifier.classify(item["title"], item["summary"])
                         
+                        # Özel Akıllı Süzgeçler (LLM) değerlendirmesi
+                        matched_filters_str = None
+                        if sector and sector != "Excluded" and custom_filters:
+                            matched_ids = self.classifier.evaluate_custom_filters(
+                                item["title"], item["summary"], custom_filters
+                            )
+                            if matched_ids:
+                                matched_filters_str = ",".join(matched_ids)
+                                logger.info(f"İhale akıllı süzgeçlerle eşleşti: {matched_ids} | '{item['title'][:40]}...'")
+                        
                         # Veritabanına kaydet
                         new_tender = Tender(
                             link=item["link"],
@@ -106,7 +130,8 @@ class TenderBotOrchestrator:
                             category=item["category"],
                             source=item["source"],
                             sector=sector,
-                            classification_method=method
+                            classification_method=method,
+                            matched_custom_filters=matched_filters_str
                         )
                         db.add(new_tender)
                         db.commit() # Her kayıtta commit ederek veritabanı durumunu güncel tutalım

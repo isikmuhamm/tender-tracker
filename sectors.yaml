@@ -1,7 +1,4 @@
-# sectors.yaml
-# Sektör tanımları ve yerel kural tabanlı sınıflandırma için anahtar kelimeler
-
-Demiryolu:
+Raylı Sistemler ve Metro:
   keywords:
     - "tcdd"
     - "demiryolu"
@@ -18,11 +15,14 @@ Demiryolu:
     - "tramvay"
     - "istasyon"
     - "depo sahası"
+    - "vagon"
+    - "travers"
+    - "lokomotif"
   negative_keywords:
     - "oyuncak"
     - "maket"
 
-Su Arıtma:
+Su, Kanalizasyon ve Arıtma:
   keywords:
     - "su arıtma"
     - "arıtma tesisi"
@@ -33,11 +33,16 @@ Su Arıtma:
     - "filtrasyon"
     - "membran"
     - "klorlama"
+    - "içme suyu"
+    - "kanal"
+    - "su kuyusu"
+    - "kollektör"
+    - "şebeke hattı"
   negative_keywords:
     - "damacana"
     - "pet şişe"
 
-İnşaat:
+İnşaat, Yol ve Altyapı:
   keywords:
     - "inşaat"
     - "yapım işi"
@@ -48,5 +53,97 @@ Su Arıtma:
     - "restorasyon"
     - "tadilat"
     - "çevre düzenlemesi"
+    - "yol yapımı"
+    - "asfalt"
+    - "köprü"
+    - "viyadük"
+    - "hafriyat"
   negative_keywords:
     - "kitap alımı"
+
+Yazılım, Donanım ve Bilişim:
+  keywords:
+    - "yazılım"
+    - "lisans"
+    - "bilgisayar"
+    - "sunucu"
+    - "server"
+    - "veri merkezi"
+    - "donanım"
+    - "network"
+    - "anahtarlayıcı"
+    - "switch"
+    - "firewall"
+    - "siber güvenlik"
+    - "it"
+    - "bilişim"
+    - "sistem kurulumu"
+  negative_keywords:
+    - "kırtasiye"
+
+Danışmanlık, Müşavirlik ve Kontrolörlük:
+  keywords:
+    - "danışmanlık"
+    - "müşavirlik"
+    - "kontrolörlük"
+    - "proje hazırlama"
+    - "fizibilite"
+    - "denetim"
+    - "teknik destek"
+    - "eğitim hizmeti"
+  negative_keywords:
+    - "reklam"
+
+Medikal, Sağlık ve Tıbbi Cihaz:
+  keywords:
+    - "medikal"
+    - "tıbbi"
+    - "tıbbi cihaz"
+    - "hastane"
+    - "laboratuvar"
+    - "kit"
+    - "reaktif"
+    - "sarf malzeme"
+    - "sterilizasyon"
+    - "röntgen"
+    - "mr"
+    - "ultrason"
+    - "sağlık"
+  negative_keywords:
+    - "temizlik"
+
+Enerji, Elektrik ve SCADA:
+  keywords:
+    - "enerji"
+    - "elektrik"
+    - "scada"
+    - "trafo"
+    - "jeneratör"
+    - "şalt"
+    - "kablo"
+    - "aydınlatma"
+    - "güneş enerjisi"
+    - "rüzgar enerjisi"
+    - "ges"
+    - "res"
+    - "plc"
+    - "otomasyon"
+    - "pano"
+  negative_keywords:
+    - "yakıt"
+
+Makine, Teçhizat ve Yedek Parça:
+  keywords:
+    - "makine"
+    - "teçhizat"
+    - "yedek parça"
+    - "pompa"
+    - "motor"
+    - "kompresör"
+    - "yedekparça"
+    - "vinc"
+    - "vinç"
+    - "onarım"
+    - "bakım"
+  negative_keywords:
+    - "bina"

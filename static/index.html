@@ -16,7 +16,7 @@
     <!-- =========================================================
          LOGIN CONTAINER
          ========================================================= -->
-    <div id="login-container" class="glass-card">
+    <div id="login-container" class="glass-card d-none">
         <h2><i class="fa-solid fa-bell"></i> İhale Takip Botu</h2>
         <p>Devam etmek için giriş yapın.</p>
         <div id="login-error" class="error-msg d-none">Kullanıcı adı veya şifre hatalı!</div>
@@ -30,6 +30,30 @@
                 <input type="password" id="password" placeholder="Şifre" required autocomplete="current-password">
             </div>
             <button type="submit" class="btn-primary">Giriş Yap</button>
+        </form>
+    </div>
+
+    <!-- =========================================================
+         SETUP CONTAINER (FIRST BOOT SETUP WIZARD)
+         ========================================================= -->
+    <div id="setup-container" class="glass-card d-none">
+        <h2><i class="fa-solid fa-shield-halved"></i> İlk Kurulum</h2>
+        <p>Yönetici (admin) hesabınızı oluşturun.</p>
+        <div id="setup-error" class="error-msg d-none">Hata oluştu!</div>
+        <form id="setup-form">
+            <div class="input-group">
+                <i class="fa-solid fa-user"></i>
+                <input type="text" id="setup-username" placeholder="Yönetici Kullanıcı Adı" required autocomplete="username">
+            </div>
+            <div class="input-group">
+                <i class="fa-solid fa-lock"></i>
+                <input type="password" id="setup-password" placeholder="Şifre (min 4 karakter)" required autocomplete="new-password">
+            </div>
+            <div class="input-group">
+                <i class="fa-solid fa-lock"></i>
+                <input type="password" id="setup-password-confirm" placeholder="Şifre Tekrar" required autocomplete="new-password">
+            </div>
+            <button type="submit" class="btn-primary">Kurulumu Tamamla</button>
         </form>
     </div>
 
@@ -88,6 +112,12 @@
                         </select>
                     </div>
                     <div class="filter-group">
+                        <label for="filter-custom">Akıllı Süzgeç</label>
+                        <select id="filter-custom">
+                            <option value="">Tümü</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
                         <label for="filter-source">Kaynak</label>
                         <select id="filter-source">
                             <option value="">Tümü</option>
@@ -119,24 +149,208 @@
             <section id="panel-config" class="panel-section d-none">
                 <div class="config-container">
                     <div id="config-alert" class="alert-msg d-none"></div>
-                    <div class="config-editors">
-                        <!-- General Config YAML -->
-                        <div class="editor-box glass-card">
-                            <h3><i class="fa-solid fa-gear"></i> Genel Ayarlar (config.yaml)</h3>
-                            <textarea id="editor-config" spellcheck="false" placeholder="Yükleniyor..."></textarea>
-                        </div>
-                        
-                        <!-- Sectors YAML -->
-                        <div class="editor-box glass-card">
-                            <h3><i class="fa-solid fa-tags"></i> Sektörler & Kelimeler (sectors.yaml)</h3>
-                            <textarea id="editor-sectors" spellcheck="false" placeholder="Yükleniyor..."></textarea>
-                        </div>
+                    
+                    <!-- Config Tabs Header -->
+                    <div class="config-tabs-bar glass-card">
+                        <button type="button" class="config-tab-btn active" data-tab="tab-general"><i class="fa-solid fa-gears"></i> Genel & LLM</button>
+                        <button type="button" class="config-tab-btn" data-tab="tab-filters"><i class="fa-solid fa-brain"></i> Akıllı Süzgeçler</button>
+                        <button type="button" class="config-tab-btn" data-tab="tab-notifications"><i class="fa-solid fa-envelope"></i> Bildirimler</button>
+                        <button type="button" class="config-tab-btn" data-tab="tab-sectors"><i class="fa-solid fa-tags"></i> Sektörler</button>
+                        <button type="button" class="config-tab-btn" data-tab="tab-security"><i class="fa-solid fa-key"></i> Şifre Değiştir</button>
                     </div>
-                    <div class="config-actions">
-                        <button id="btn-save-config" class="btn-primary">
-                            <i class="fa-solid fa-floppy-disk"></i> Değişiklikleri Kaydet
-                        </button>
-                    </div>
+
+                    <form id="config-form">
+                        <!-- Tab Content: General & LLM -->
+                        <div id="tab-general" class="config-tab-content glass-card">
+                            <h3>Genel & Yapay Zeka (LLM) Ayarları</h3>
+                            <div class="form-row">
+                                <div class="form-group col-6">
+                                    <label for="cfg-server-port">Sunucu Portu</label>
+                                    <input type="number" id="cfg-server-port" min="80" max="65535" required>
+                                </div>
+                                <div class="form-group col-6">
+                                    <label for="cfg-check-interval">Tarama Sıklığı (Dakika)</label>
+                                    <input type="number" id="cfg-check-interval" min="5" required>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Aktif Kaynaklar (Scrapers)</label>
+                                <div class="checkbox-group">
+                                    <label><input type="checkbox" id="cfg-scraper-yatirimlar" value="yatirimlar"> Yatırımlar Dergisi</label>
+                                    <label><input type="checkbox" id="cfg-scraper-dmo" value="dmo"> DMO</label>
+                                    <label><input type="checkbox" id="cfg-scraper-ilan" value="ilan_gov_tr"> ilan.gov.tr</label>
+                                    <label><input type="checkbox" id="cfg-scraper-ekapv2" value="ekapv2"> EKAPv2</label>
+                                </div>
+                            </div>
+                            
+                            <hr class="form-divider">
+                            
+                            <div class="form-group">
+                                <label for="cfg-llm-provider">Aktif Yapay Zeka (LLM) Sağlayıcısı</label>
+                                <select id="cfg-llm-provider">
+                                    <option value="none">Kapalı (Sadece Kelime Eşleşmeli Yerel Filtre)</option>
+                                    <option value="gemini">Google Gemini</option>
+                                    <option value="openai">OpenAI / Uyumlu API (Ollama, DeepSeek vb.)</option>
+                                    <option value="claude">Anthropic Claude</option>
+                                </select>
+                            </div>
+
+                            <!-- Provider Settings Block: Gemini -->
+                            <div id="provider-block-gemini" class="provider-block d-none">
+                                <h4>Google Gemini Yapılandırması</h4>
+                                <div class="form-group">
+                                    <label for="cfg-gemini-key">API Anahtarı (API Key)</label>
+                                    <input type="password" id="cfg-gemini-key" placeholder="A1zaSy...">
+                                </div>
+                                <div class="form-group">
+                                    <label for="cfg-gemini-model">Model Adı</label>
+                                    <input type="text" id="cfg-gemini-model" placeholder="gemini-1.5-flash">
+                                </div>
+                            </div>
+
+                            <!-- Provider Settings Block: OpenAI -->
+                            <div id="provider-block-openai" class="provider-block d-none">
+                                <h4>OpenAI veya Uyumlu API Yapılandırması</h4>
+                                <div class="form-group">
+                                    <label for="cfg-openai-key">API Anahtarı (API Key)</label>
+                                    <input type="password" id="cfg-openai-key" placeholder="sk-...">
+                                </div>
+                                <div class="form-group">
+                                    <label for="cfg-openai-model">Model Adı</label>
+                                    <input type="text" id="cfg-openai-model" placeholder="gpt-4o-mini">
+                                </div>
+                                <div class="form-group">
+                                    <label for="cfg-openai-url">API Uç Noktası (Base URL)</label>
+                                    <input type="text" id="cfg-openai-url" placeholder="https://api.openai.com/v1">
+                                </div>
+                            </div>
+
+                            <!-- Provider Settings Block: Claude -->
+                            <div id="provider-block-claude" class="provider-block d-none">
+                                <h4>Anthropic Claude Yapılandırması</h4>
+                                <div class="form-group">
+                                    <label for="cfg-claude-key">API Anahtarı (API Key)</label>
+                                    <input type="password" id="cfg-claude-key" placeholder="sk-ant-...">
+                                </div>
+                                <div class="form-group">
+                                    <label for="cfg-claude-model">Model Adı</label>
+                                    <input type="text" id="cfg-claude-model" placeholder="claude-3-5-sonnet-20241022">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tab Content: Smart Filters -->
+                        <div id="tab-filters" class="config-tab-content glass-card d-none">
+                            <div class="content-header">
+                                <h3>Özel Akıllı Süzgeçler (LLM Prompts)</h3>
+                                <button type="button" id="btn-add-filter" class="btn-small-primary"><i class="fa-solid fa-plus"></i> Süzgeç Ekle</button>
+                            </div>
+                            <p class="section-desc">Geniş sektör filtresini geçen ihaleleri, kendi belirleyeceğiniz özel LLM süzgeçleriyle tarayıp sadece ilgilendiğiniz kelimeleri ayıklayabilirsiniz.</p>
+                            <div class="table-wrapper">
+                                <table class="settings-table">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 20%;">Süzgeç İsmi</th>
+                                            <th style="width: 55%;">Yapay Zeka Yönergesi (Prompt)</th>
+                                            <th style="width: 15%; text-align: center;">Aktif</th>
+                                            <th style="width: 10%; text-align: center;">İşlem</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="custom-filters-list">
+                                        <!-- Dynamic list rows -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Tab Content: Notifications -->
+                        <div id="tab-notifications" class="config-tab-content glass-card d-none">
+                            <h3>Bildirim Kanalları Yapılandırması</h3>
+                            
+                            <h4>E-posta (SMTP) Bildirimi</h4>
+                            <div class="form-row">
+                                <div class="form-group col-8">
+                                    <label for="cfg-smtp-server">SMTP Sunucu Adresi</label>
+                                    <input type="text" id="cfg-smtp-server" placeholder="smtp.gmail.com">
+                                </div>
+                                <div class="form-group col-4">
+                                    <label for="cfg-smtp-port">SMTP Port</label>
+                                    <input type="number" id="cfg-smtp-port" placeholder="587">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group col-6">
+                                    <label for="cfg-smtp-user">Kullanıcı Adı (E-posta)</label>
+                                    <input type="text" id="cfg-smtp-user" placeholder="ornek@gmail.com">
+                                </div>
+                                <div class="form-group col-6">
+                                    <label for="cfg-smtp-pass">Şifre</label>
+                                    <input type="password" id="cfg-smtp-pass" placeholder="Sunucu mail uygulama şifresi">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="cfg-mail-sender">Gönderici E-posta Adresi (From)</label>
+                                <input type="email" id="cfg-mail-sender" placeholder="ornek@gmail.com">
+                            </div>
+                            <div class="form-group">
+                                <label for="cfg-mail-recipients">Alıcı E-posta Adresleri (Virgülle ayırın)</label>
+                                <input type="text" id="cfg-mail-recipients" placeholder="mali@sirket.com, bilgi@sirket.com">
+                            </div>
+
+                            <hr class="form-divider">
+
+                            <h4>Telegram Bildirimi</h4>
+                            <div class="form-group">
+                                <label for="cfg-telegram-token">Telegram Bot Token</label>
+                                <input type="password" id="cfg-telegram-token" placeholder="123456789:ABCdefGhI...">
+                            </div>
+                            <div class="form-group">
+                                <label for="cfg-telegram-chat">Kanal veya Grup Chat ID</label>
+                                <input type="text" id="cfg-telegram-chat" placeholder="-100123456789 veya kanal_id">
+                            </div>
+                        </div>
+
+                        <!-- Tab Content: Sectors & Negative Keywords -->
+                        <div id="tab-sectors" class="config-tab-content glass-card d-none">
+                            <div class="content-header">
+                                <h3>Sektörler ve Küresel Filtreler</h3>
+                                <button type="button" id="btn-add-sector" class="btn-small-primary"><i class="fa-solid fa-plus"></i> Sektör Ekle</button>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="cfg-exclude-keywords">Küresel Yasaklı Kelimeler (İhaleyi tamamen eler, virgülle ayırın)</label>
+                                <input type="text" id="cfg-exclude-keywords" placeholder="oyuncak, maket, kiralık araba">
+                            </div>
+
+                            <div class="sectors-accordion-list" id="sectors-accordion-container">
+                                <!-- Dynamic sector configurations -->
+                            </div>
+                        </div>
+
+                        <!-- Tab Content: Security / Password change -->
+                        <div id="tab-security" class="config-tab-content glass-card d-none">
+                            <h3>Şifre Güncelleme</h3>
+                            <div class="form-group">
+                                <label for="sec-old-pass">Mevcut Şifre</label>
+                                <input type="password" id="sec-old-pass" required autocomplete="current-password">
+                            </div>
+                            <div class="form-group">
+                                <label for="sec-new-pass">Yeni Şifre (En az 4 karakter)</label>
+                                <input type="password" id="sec-new-pass" required autocomplete="new-password">
+                            </div>
+                            <div class="form-group">
+                                <label for="sec-confirm-pass">Yeni Şifre Tekrar</label>
+                                <input type="password" id="sec-confirm-pass" required autocomplete="new-password">
+                            </div>
+                            <button type="button" id="btn-change-password" class="btn-secondary">Şifreyi Değiştir</button>
+                        </div>
+
+                        <div class="config-actions">
+                            <button type="submit" id="btn-save-config" class="btn-primary">
+                                <i class="fa-solid fa-floppy-disk"></i> Ayarları Kaydet
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </section>
 

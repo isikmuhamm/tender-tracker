@@ -2,31 +2,23 @@ import os
 import logging
 import json
 import yaml
-from dotenv import load_dotenv
+from src.llm_client import LLMClient
 
 logger = logging.getLogger(__name__)
-
-# Lazy import google.generativeai to avoid errors if not configured or needed
-genai_available = False
-try:
-    import google.generativeai as genai
-    genai_available = True
-except ImportError:
-    pass
 
 class TenderClassifier:
     """
     İhaleleri sektörel olarak sınıflandıran katman.
-    API anahtarı varsa Gemini ile, yoksa kural tabanlı (sectors.yaml) yerel filtreyle çalışır.
+    API anahtarı varsa LLM ile, yoksa kural tabanlı (sectors.yaml) yerel filtreyle çalışır.
     """
-    def __init__(self, sectors_path: str = "sectors.yaml"):
-        self.sectors_path = sectors_path
+    def __init__(self, sectors_path: str = None):
+        from src.database import get_data_path
+        self.sectors_path = sectors_path or get_data_path("sectors.yaml")
         self.sectors = {}
-        self.ai_enabled = False
-        self.model = None
+        self.llm = LLMClient()
+        self.ai_enabled = self.llm.is_enabled()
         
         self.load_sectors()
-        self.init_ai()
 
     def load_sectors(self):
         if not os.path.exists(self.sectors_path):
@@ -39,22 +31,6 @@ class TenderClassifier:
         except Exception as e:
             logger.error(f"Sektör tanımları yüklenirken hata: {e}")
 
-    def init_ai(self):
-        load_dotenv()
-        api_key = os.getenv("GEMINI_API_KEY")
-        if api_key and genai_available:
-            try:
-                genai.configure(api_key=api_key)
-                # Modern gemini-1.5-flash modelini kullanıyoruz
-                self.model = genai.GenerativeModel("gemini-1.5-flash")
-                self.ai_enabled = True
-                logger.info("Yapay Zeka (Gemini API) sınıflandırma katmanı başarıyla aktif edildi.")
-            except Exception as e:
-                logger.error(f"Gemini API yapılandırılırken hata oluştu: {e}")
-                self.ai_enabled = False
-        else:
-            logger.info("Yapay zeka anahtarı bulunamadı veya paket kurulu değil. Yerel kural tabanlı mod aktif.")
-
     def classify_local(self, title: str, summary: str = "") -> str:
         """
         sectors.yaml dosyasındaki anahtar kelimelere göre yerel sınıflandırma yapar.
@@ -66,7 +42,6 @@ class TenderClassifier:
         max_score = 0
         
         for sector_name, rules in self.sectors.items():
-            # Negatif anahtar kelime eşleşmesi kontrolü
             negatives = rules.get("negative_keywords", [])
             has_negative = False
             for nw in negatives:
@@ -76,7 +51,6 @@ class TenderClassifier:
             if has_negative:
                 continue
                 
-            # Pozitif anahtar kelime puanlama
             keywords = rules.get("keywords", [])
             score = 0
             for kw in keywords:
@@ -86,21 +60,19 @@ class TenderClassifier:
                 elif kw_lower in s:
                     score += 1
             
-            # En yüksek skorlu sektörü seç
             if score > max_score:
                 max_score = score
                 best_sector = sector_name
                 
-        # Eşik değer 2'dir (başlıkta en az bir kelime veya açıklamada iki kelime eşleşmeli)
         if max_score >= 2:
             return best_sector
         return None
 
     def classify_ai(self, title: str, summary: str = "") -> str:
         """
-        Gemini API kullanarak başlık ve özeti analiz edip ihaleyi sınıflandırır.
+        Aktif LLM sağlayıcısını kullanarak başlık ve özeti analiz edip ihaleyi sınıflandırır.
         """
-        if not self.ai_enabled or not self.model:
+        if not self.ai_enabled:
             return None
             
         sectors_list = list(self.sectors.keys())
@@ -117,32 +89,80 @@ class TenderClassifier:
         }}
         """
         try:
-            response = self.model.generate_content(
-                prompt,
-                generation_config={"response_mime_type": "application/json"}
-            )
-            data = json.loads(response.text)
+            res_text = self.llm.complete(prompt, json_response=True)
+            if not res_text:
+                return None
+            if res_text.startswith("```"):
+                lines = res_text.splitlines()
+                if len(lines) > 2:
+                    res_text = "\n".join(lines[1:-1])
+            data = json.loads(res_text)
             sector = data.get("sector")
             if sector in sectors_list:
                 return sector
             return None
         except Exception as e:
-            logger.error(f"Gemini API sınıflandırma hatası: {e}")
+            logger.error(f"LLM sınıflandırma hatası: {e}")
             return None
+
+    def evaluate_custom_filters(self, title: str, summary: str, custom_filters: list) -> list:
+        """
+        İhaleyi kullanıcının özel tanımladığı akıllı süzgeçlere (custom_llm_filters) göre LLM ile değerlendirir.
+        Dönen çıktı: Eşleşen süzgeçlerin ID listesi (örn: ["metro_plc"])
+        """
+        if not self.ai_enabled or not custom_filters:
+            return []
+            
+        active_filters = [f for f in custom_filters if f.get("enabled", True)]
+        if not active_filters:
+            return []
+            
+        filters_json = [{"id": f["id"], "name": f["name"], "instruction": f["prompt_instruction"]} for f in active_filters]
+        
+        prompt = f"""
+        Aşağıdaki ihale ilanı başlık ve detayını, tanımlanan 'Özel Akıllı Süzgeçler' yönergelerine göre değerlendir.
+        Her süzgecin yönergesini oku ve bu ihalenin o yönergeyle eşleşip eşleşmediğini (True/False) belirle.
+        
+        İhale Başlığı: {title}
+        İhale Detayı: {summary}
+        
+        Süzgeç Tanımları:
+        {json.dumps(filters_json, ensure_ascii=False, indent=2)}
+        
+        Yanıtı sadece aşağıdaki JSON şemasında ver. Yalnızca eşleşen (True olan) süzgeçlerin ID listesini dön:
+        {{
+            "matched_filter_ids": ["eslesen_id_1", "eslesen_id_2"]
+        }}
+        """
+        
+        try:
+            res_text = self.llm.complete(prompt, json_response=True)
+            if not res_text:
+                return []
+            if res_text.startswith("```"):
+                lines = res_text.splitlines()
+                if len(lines) > 2:
+                    res_text = "\n".join(lines[1:-1])
+            data = json.loads(res_text)
+            matched = data.get("matched_filter_ids", [])
+            
+            valid_ids = {f["id"] for f in active_filters}
+            return [mid for mid in matched if mid in valid_ids]
+        except Exception as e:
+            logger.error(f"LLM akıllı süzgeç değerlendirme hatası: {e}")
+            return []
 
     def classify(self, title: str, summary: str = "") -> tuple:
         """
         İhaleyi sınıflandırır. 
         Dönen çıktı: (SektörAdı veya None, SınıflandırmaYöntemi)
         """
-        # Önce yapay zeka ile dene
         if self.ai_enabled:
             sector = self.classify_ai(title, summary)
             if sector:
                 logger.info(f"İhale AI ile sınıflandırıldı: '{sector}' | '{title[:40]}...'")
                 return sector, "ai"
                 
-        # Yapay zeka eşleşme bulamazsa veya kapalıysa kural tabanlıya dön
         sector = self.classify_local(title, summary)
         method = "rule" if sector else "none"
         if sector:

@@ -8,8 +8,9 @@ class TenderFilter:
     """
     İhaleleri küresel kurallara (örneğin kiralık/satılık filtreleri) göre eleyen sınıf.
     """
-    def __init__(self, config_path: str = "config.yaml"):
-        self.config_path = config_path
+    def __init__(self, config_path: str = None):
+        from src.database import get_data_path
+        self.config_path = config_path or get_data_path("config.yaml")
         self.exclude_keywords = []
         self.load_config()
 

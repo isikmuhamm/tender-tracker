@@ -2,14 +2,37 @@ import os
 import sys
 import threading
 import yaml
+import logging
+import urllib3
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
-from src.database import init_db, get_db, Tender, User
+from src.database import init_db, get_db, Tender, User, get_data_path
 from src.auth import verify_password, create_access_token, get_current_user
 from src.scheduler import TenderBotOrchestrator
+
+# Urllib3 HTTPS sertifika uyarılarını kapat
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# Global logging yapılandırması
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+# Dosya handler (events.log)
+log_path = get_data_path("events.log")
+file_handler = logging.FileHandler(log_path, encoding="utf-8")
+file_handler.setFormatter(logging.Formatter('%(asctime)s - %(message)s'))
+file_handler.setLevel(logging.INFO)
+logger.addHandler(file_handler)
+
+# Stream handler (Konsol)
+if not any(isinstance(h, logging.StreamHandler) and not isinstance(h, logging.FileHandler) for h in logger.handlers):
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+    console_handler.setLevel(logging.INFO)
+    logger.addHandler(console_handler)
 
 app = FastAPI(title="Tender Tracker API", version="1.0.0")
 
@@ -31,15 +54,16 @@ if not getattr(sys, 'frozen', False):
 
 # Varsayılan konfigürasyon dosyalarını kopyala (yerelde yoksa)
 for filename in ["config.yaml", "sectors.yaml"]:
-    if not os.path.exists(filename):
+    dest_path = get_data_path(filename)
+    if not os.path.exists(dest_path):
         src_path = get_resource_path(filename)
         if os.path.exists(src_path):
             try:
                 import shutil
-                shutil.copy(src_path, filename)
-                print(f"Varsayılan {filename} kopyalandı.")
+                shutil.copy(src_path, dest_path)
+                logging.info(f"Varsayılan {filename} kopyalandı -> {dest_path}")
             except Exception as e:
-                print(f"{filename} kopyalanırken hata: {e}")
+                logging.error(f"{filename} kopyalanırken hata: {e}")
 
 # Static dosyaları yönlendir
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
@@ -66,6 +90,66 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         )
     access_token = create_access_token(data={"sub": user.username})
     return {"access_token": access_token, "token_type": "bearer"}
+
+@app.get("/api/auth/setup-status")
+def get_setup_status(db: Session = Depends(get_db)):
+    """Yönetici hesabı kurulu mu kontrol eder."""
+    user_count = db.query(User).count()
+    return {"setup_required": user_count == 0}
+
+@app.post("/api/auth/setup")
+def setup_admin(payload: dict, db: Session = Depends(get_db)):
+    """İlk açılışta yönetici hesabı oluşturur."""
+    if db.query(User).count() > 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Kurulum zaten tamamlanmış. Yeni yönetici eklenemez."
+        )
+        
+    username = payload.get("username")
+    password = payload.get("password")
+    
+    if not username or not password or len(password) < 4:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Kullanıcı adı ve şifre gereklidir. Şifre en az 4 karakter olmalıdır."
+        )
+        
+    from src.auth import get_password_hash
+    hashed_password = get_password_hash(password)
+    user = User(username=username, password_hash=hashed_password)
+    db.add(user)
+    db.commit()
+    
+    return {"success": True, "message": "Yönetici hesabı başarıyla oluşturuldu."}
+
+@app.post("/api/auth/change-password")
+def change_password(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Aktif kullanıcının şifresini değiştirir."""
+    old_password = payload.get("old_password")
+    new_password = payload.get("new_password")
+    
+    if not old_password or not new_password or len(new_password) < 4:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Mevcut ve yeni şifre gereklidir. Yeni şifre en az 4 karakter olmalıdır."
+        )
+        
+    if not verify_password(old_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Mevcut şifre hatalı."
+        )
+        
+    from src.auth import get_password_hash
+    current_user.password_hash = get_password_hash(new_password)
+    db.commit()
+    
+    return {"success": True, "message": "Şifre başarıyla güncellendi."}
 
 # =========================================================
 # TENDERS API
@@ -100,7 +184,8 @@ def get_tenders(
                 "category": t.category,
                 "source": t.source,
                 "sector": t.sector,
-                "first_seen": t.first_seen.isoformat() if t.first_seen else None
+                "first_seen": t.first_seen.isoformat() if t.first_seen else None,
+                "matched_custom_filters": t.matched_custom_filters
             }
             for t in items
         ]
@@ -124,20 +209,30 @@ def trigger_scraper(current_user: User = Depends(get_current_user)):
 # =========================================================
 @app.get("/api/config")
 def get_config(current_user: User = Depends(get_current_user)):
-    """Mevcut config.yaml ve sectors.yaml içeriğini okur."""
-    config_yaml = ""
-    sectors_yaml = ""
+    """Mevcut yapılandırma (config.yaml ve sectors.yaml) verilerini JSON olarak okur."""
+    config_data = {}
+    sectors_data = {}
     
-    if os.path.exists("config.yaml"):
-        with open("config.yaml", "r", encoding="utf-8") as f:
-            config_yaml = f.read()
-    if os.path.exists("sectors.yaml"):
-        with open("sectors.yaml", "r", encoding="utf-8") as f:
-            sectors_yaml = f.read()
-            
+    config_path = get_data_path("config.yaml")
+    sectors_path = get_data_path("sectors.yaml")
+    
+    if os.path.exists(config_path):
+        with open(config_path, "r", encoding="utf-8") as f:
+            try:
+                config_data = yaml.safe_load(f) or {}
+            except Exception as e:
+                logging.error(f"config.yaml ayrıştırılırken hata: {e}")
+                
+    if os.path.exists(sectors_path):
+        with open(sectors_path, "r", encoding="utf-8") as f:
+            try:
+                sectors_data = yaml.safe_load(f) or {}
+            except Exception as e:
+                logging.error(f"sectors.yaml ayrıştırılırken hata: {e}")
+                
     return {
-        "config_yaml": config_yaml,
-        "sectors_yaml": sectors_yaml
+        "config": config_data,
+        "sectors": sectors_data
     }
 
 @app.post("/api/config")
@@ -145,34 +240,27 @@ def save_config(
     payload: dict,
     current_user: User = Depends(get_current_user)
 ):
-    """Gönderilen config.yaml ve sectors.yaml içeriğini doğrular ve kaydeder."""
-    config_yaml = payload.get("config_yaml")
-    sectors_yaml = payload.get("sectors_yaml")
+    """Gönderilen JSON yapılandırma verilerini doğrular ve YAML dosyalarına kaydeder."""
+    config_data = payload.get("config")
+    sectors_data = payload.get("sectors")
     
-    # YAML geçerlilik doğrulaması
+    config_path = get_data_path("config.yaml")
+    sectors_path = get_data_path("sectors.yaml")
+    
     try:
-        if config_yaml:
-            yaml.safe_load(config_yaml)
-        if sectors_yaml:
-            yaml.safe_load(sectors_yaml)
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Geçersiz YAML formatı: {e}"
-        )
-        
-    try:
-        if config_yaml:
-            with open("config.yaml", "w", encoding="utf-8") as f:
-                f.write(config_yaml)
-        if sectors_yaml:
-            with open("sectors.yaml", "w", encoding="utf-8") as f:
-                f.write(sectors_yaml)
+        if config_data is not None:
+            with open(config_path, "w", encoding="utf-8") as f:
+                yaml.safe_dump(config_data, f, allow_unicode=True, sort_keys=False)
+                
+        if sectors_data is not None:
+            with open(sectors_path, "w", encoding="utf-8") as f:
+                yaml.safe_dump(sectors_data, f, allow_unicode=True, sort_keys=False)
+                
         return {"success": True, "message": "Yapılandırma başarıyla güncellendi."}
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Dosya yazma hatası: {e}"
+            detail=f"Dosyalar kaydedilirken hata oluştu: {e}"
         )
 
 # =========================================================
@@ -181,10 +269,11 @@ def save_config(
 @app.get("/api/logs")
 def get_logs(current_user: User = Depends(get_current_user)):
     """Son 100 satır olay loglarını döner."""
-    if not os.path.exists("events.log"):
+    log_path = get_data_path("events.log")
+    if not os.path.exists(log_path):
         return {"logs": "Log dosyası henüz oluşturulmadı."}
     try:
-        with open("events.log", "r", encoding="utf-8") as f:
+        with open(log_path, "r", encoding="utf-8") as f:
             lines = f.readlines()
         return {"logs": "".join(lines[-100:])}
     except Exception as e:
@@ -198,7 +287,19 @@ if __name__ == "__main__":
     import webbrowser
     import time
     
-    port = int(os.getenv("PORT", 8000))
+    # Port bilgisini config.yaml'dan okumayı dene
+    port = 8000
+    config_path = get_data_path("config.yaml")
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                cfg = yaml.safe_load(f)
+                if cfg and "settings" in cfg:
+                    port = int(cfg["settings"].get("server_port", port))
+        except Exception:
+            pass
+            
+    port = int(os.getenv("PORT", port))
     host = os.getenv("HOST", "127.0.0.1")
     
     def open_browser():
