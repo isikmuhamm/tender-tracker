@@ -5,3 +5,9 @@ pyyaml==6.0.1
 SQLAlchemy==2.0.28
 google-generativeai==0.4.1
 pytest
+fastapi
+uvicorn
+python-multipart
+pyjwt
+bcrypt
+pyinstaller
