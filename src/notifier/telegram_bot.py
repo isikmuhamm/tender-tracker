@@ -1,6 +1,7 @@
 import os
 import logging
 import requests
+import html
 from typing import List, Dict, Any
 from .base import BaseNotifier
 
@@ -77,9 +78,18 @@ class TelegramNotifier(BaseNotifier):
                     grouped[sector] = []
                 grouped[sector].append(t)
 
+            def safe_url(url: str) -> str:
+                if not url:
+                    return "#"
+                clean = url.strip().lower()
+                if clean.startswith("http://") or clean.startswith("https://"):
+                    return url
+                return "#"
+
             success = True
             for sector_name, items in grouped.items():
-                message = f"<b>📁 {sector_name} ({len(items)} Yeni İhale)</b>\n\n"
+                escaped_sector = html.escape(sector_name)
+                message = f"<b>📁 {escaped_sector} ({len(items)} Yeni İhale)</b>\n\n"
                 
                 for item in items:
                     source = item.get("source", "").upper()
@@ -87,16 +97,21 @@ class TelegramNotifier(BaseNotifier):
                     summary = item.get("summary", "")
                     link = item.get("link", "#")
                     
-                    tender_text = f"• [{source}] <b>{title}</b>\n"
-                    if summary:
-                        tender_text += f"<i>{summary}</i>\n"
-                    tender_text += f"🔗 <a href='{link}'>Detay ve Bağlantı</a>\n\n"
+                    escaped_source = html.escape(source)
+                    escaped_title = html.escape(title)
+                    escaped_summary = html.escape(summary)
+                    escaped_link = html.escape(safe_url(link))
+                    
+                    tender_text = f"• [{escaped_source}] <b>{escaped_title}</b>\n"
+                    if escaped_summary:
+                        tender_text += f"<i>{escaped_summary}</i>\n"
+                    tender_text += f"🔗 <a href='{escaped_link}'>Detay ve Bağlantı</a>\n\n"
                     
                     # Telegram 4096 karakter sınırını aşmamak için bölme mantığı
                     if len(message) + len(tender_text) > 4000:
                         if not self._send_raw_message(message):
                             success = False
-                        message = f"<b>📁 {sector_name} (Devam...)</b>\n\n"
+                        message = f"<b>📁 {escaped_sector} (Devam...)</b>\n\n"
                         
                     message += tender_text
                 

@@ -76,3 +76,38 @@ def test_telegram_notifier_message_splitting(mock_post, temp_tg_config):
     assert success is True
     # Bölme nedeniyle en az 2 kere istek atılmış olmalı
     assert mock_post.call_count >= 2
+
+@patch("requests.post")
+def test_telegram_notifier_xss_escaping(mock_post, temp_tg_config):
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_post.return_value = mock_resp
+    
+    notifier = TelegramNotifier(config_path=temp_tg_config)
+    
+    tenders = [
+        {
+            "link": "javascript:alert(1)",  # Malicious link
+            "title": "<b>Danger Title</b> <script>alert(1)</script>",
+            "summary": "Malicious summary <img src=x onerror=alert(2)>",
+            "source": "dmo",
+            "sector": "Demiryolu <iframe src=xxx>"
+        }
+    ]
+    
+    success = notifier.send_notification(tenders)
+    assert success is True
+    
+    call_args = mock_post.call_args[1]
+    payload = call_args["json"]
+    text = payload["text"]
+    
+    # Assert html.escape did its job
+    assert "&lt;script&gt;" in text
+    assert "&lt;b&gt;Danger Title&lt;/b&gt;" in text
+    assert "&lt;img src=x onerror=alert(2)&gt;" in text
+    assert "Demiryolu &lt;iframe src=xxx&gt;" in text
+    
+    # Assert URL protocol is safe (link is replaced with #, not javascript:)
+    assert "href='#" in text or 'href="#' in text
+    assert "javascript:" not in text

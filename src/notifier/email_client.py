@@ -1,6 +1,7 @@
 import os
 import logging
 import smtplib
+import html
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from datetime import datetime
@@ -69,6 +70,14 @@ class EmailNotifier(BaseNotifier):
                     grouped[sector] = []
                 grouped[sector].append(t)
 
+            def safe_url(url: str) -> str:
+                if not url:
+                    return "#"
+                clean = url.strip().lower()
+                if clean.startswith("http://") or clean.startswith("https://"):
+                    return url
+                return "#"
+
             # HTML gövdesini oluştur
             today = datetime.now().strftime("%d.%m.%Y")
             body = f"""
@@ -81,9 +90,10 @@ class EmailNotifier(BaseNotifier):
             """
 
             for sector_name, items in grouped.items():
+                escaped_sector = html.escape(sector_name)
                 body += f"""
                 <h3 style="color: #d05b22; margin-top: 25px; border-bottom: 1px solid #ddd; padding-bottom: 3px;">
-                    📁 {sector_name} ({len(items)} İhale)
+                    📁 {escaped_sector} ({len(items)} İhale)
                 </h3>
                 <table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; width: 100%; border: 1px solid #ddd;">
                     <thead>
@@ -105,14 +115,20 @@ class EmailNotifier(BaseNotifier):
                         badge_style = "color: #28a745; font-weight: bold;"
                     elif source_badge == "DMO":
                         badge_style = "color: #fd7e14; font-weight: bold;"
+                    
+                    escaped_source = html.escape(source_badge)
+                    escaped_category = html.escape(i.get('category', ''))
+                    escaped_title = html.escape(i.get('title', ''))
+                    escaped_summary = html.escape(i.get('summary', ''))
+                    escaped_link = html.escape(safe_url(i.get('link', '#')))
                         
                     body += f"""
                         <tr>
-                            <td style="{badge_style}">{source_badge}</td>
-                            <td>{i.get('category', '')}</td>
-                            <td><b>{i.get('title', '')}</b></td>
-                            <td style="font-size: 12px; color: #666;">{i.get('summary', '')}</td>
-                            <td style="text-align: center;"><a href="{i.get('link', '#')}" style="color: #007bff; text-decoration: none; font-weight: bold;">İhale</a></td>
+                            <td style="{badge_style}">{escaped_source}</td>
+                            <td>{escaped_category}</td>
+                            <td><b>{escaped_title}</b></td>
+                            <td style="font-size: 12px; color: #666;">{escaped_summary}</td>
+                            <td style="text-align: center;"><a href="{escaped_link}" style="color: #007bff; text-decoration: none; font-weight: bold;">İhale</a></td>
                         </tr>
                     """
                 body += """
