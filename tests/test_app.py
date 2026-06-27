@@ -310,30 +310,35 @@ def test_job_status_and_mutual_exclusion(client):
     assert status_resp.json()["status"] == "idle"
     assert status_resp.json()["last_run_status"] == "success"
 
-def test_process_lock_concurrency(client):
+def test_process_lock_concurrency(client, tmp_path):
     from src.process_lock import ProcessLock
-    lock1 = ProcessLock("scan")
-    lock2 = ProcessLock("scan")
     
-    lock1.release()
-    
-    assert lock1.acquire() is True
-    assert lock2.acquire() is False
-    
-    login_resp = client.post(
-        "/api/auth/login",
-        data={"username": "admin", "password": "admin"}
-    )
-    token = login_resp.json()["access_token"]
-    headers = {"Authorization": f"Bearer {token}"}
-    
-    trigger_resp = client.post("/api/tenders/trigger", headers=headers)
-    assert trigger_resp.status_code == 409
-    assert "meşgul" in trigger_resp.json()["detail"] or "meşgul" in trigger_resp.json()["detail"].lower()
-    
-    lock1.release()
-    assert lock2.acquire() is True
-    lock2.release()
+    def mock_get_data_path(filename):
+        return str(tmp_path / filename)
+        
+    with patch("src.process_lock.get_data_path", side_effect=mock_get_data_path):
+        lock1 = ProcessLock("scan")
+        lock2 = ProcessLock("scan")
+        
+        lock1.release()
+        
+        assert lock1.acquire() is True
+        assert lock2.acquire() is False
+        
+        login_resp = client.post(
+            "/api/auth/login",
+            data={"username": "admin", "password": "admin"}
+        )
+        token = login_resp.json()["access_token"]
+        headers = {"Authorization": f"Bearer {token}"}
+        
+        trigger_resp = client.post("/api/tenders/trigger", headers=headers)
+        assert trigger_resp.status_code == 409
+        assert "meşgul" in trigger_resp.json()["detail"] or "meşgul" in trigger_resp.json()["detail"].lower()
+            
+        lock1.release()
+        assert lock2.acquire() is True
+        lock2.release()
 
 def test_frontend_xss_via_node():
     import subprocess

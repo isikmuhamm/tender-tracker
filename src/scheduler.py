@@ -81,6 +81,7 @@ class TenderBotOrchestrator:
         successful_sources = 0
         failed_sources = 0
         records_added = 0
+        processing_errors = 0
         
         try:
             # 1. Tüm kazıcıları çalıştır
@@ -117,6 +118,7 @@ class TenderBotOrchestrator:
                                 logger.info(f"Elenen ihale kaydedildi (Excluded): {item['title'][:40]}...")
                             except Exception as db_err:
                                 db.rollback()
+                                processing_errors += 1
                                 logger.error(f"Elenen ihale veritabanına kaydedilirken hata oluştu: {db_err}")
                             continue
                             
@@ -161,6 +163,7 @@ class TenderBotOrchestrator:
                                 })
                         except Exception as tender_err:
                             db.rollback()
+                            processing_errors += 1
                             logger.error(f"İhale işlenirken veya kaydedilirken hata oluştu: {tender_err}")
                             
                 except Exception as e:
@@ -180,19 +183,26 @@ class TenderBotOrchestrator:
             logger.info("Tarama döngüsü tamamlandı.")
 
         # Durumu belirle
-        if successful_sources > 0 and failed_sources == 0 and notification_errors == 0:
-            status_str = "success"
-        elif successful_sources > 0 and (failed_sources > 0 or notification_errors > 0):
-            status_str = "partial"
-        elif successful_sources == 0 and failed_sources > 0:
+        has_any_errors = (failed_sources > 0 or processing_errors > 0 or notification_errors > 0)
+        
+        if records_added == 0 and (failed_sources > 0 or processing_errors > 0):
             status_str = "failed"
-        else:
-            status_str = "success"
+        elif successful_sources > 0:
+            if has_any_errors:
+                status_str = "partial"
+            else:
+                status_str = "success"
+        elif successful_sources == 0:
+            if failed_sources > 0 or processing_errors > 0:
+                status_str = "failed"
+            else:
+                status_str = "success"
             
         return {
             "successful_sources": successful_sources,
             "failed_sources": failed_sources,
             "records_added": records_added,
+            "processing_errors": processing_errors,
             "notification_errors": notification_errors,
             "status": status_str
         }

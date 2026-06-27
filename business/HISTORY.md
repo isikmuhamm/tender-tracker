@@ -325,6 +325,7 @@ Begin `P0.2 EKAP Public Tender Extraction` as the next focused implementation it
 **Date:** 2026-06-27
 
 **Key commits:**
+- `29b18fe` — secure model list client API key headers, add Node JS DOM XSS tests, and update target link tabnabbing
 - `681dc97` — escape dynamic template fields and validate url protocols in dashboard UI to prevent XSS
 - `4b5b8ff` — escape template variables and restrict links in email and telegram notifiers with tests
 - `d0715b8` — security/integrity: isolate transaction boundaries and secure scheduler persistence paths with tests
@@ -347,6 +348,7 @@ The application achieved baseline data integrity and protection against stored-X
 **Date:** 2026-06-27
 
 **Key commits:**
+- `29b18fe` — integrate process-safe file locks, collect run result metrics, and update project governance boards
 - `dc1d040` — security/concurrency: implement authoritative job manager, status polling, and scan mutual exclusion with tests
 - `590d9b6` — fix/cli: import missing os module, integrate config-based check intervals, and handle Ctrl+C exit safely in daemon mode, with unit tests
 
@@ -357,4 +359,4 @@ The application achieved baseline data integrity and protection against stored-X
 - KeyboardInterrupt signal wrapping daemon sleep/run loops to guarantee clean CLI exit.
 
 ### Architectural Result
-Multi-process concurrency races between FastAPI and cron/CLI processes are prevented. Config-based check interval settings are mapped with fallback rules to environment settings.
+Process-level lock implementation added; cross-process operational verification remains pending. Config-based check interval settings are mapped with fallback rules to environment settings.

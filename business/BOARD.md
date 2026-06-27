@@ -89,7 +89,7 @@ Work on one item at a time unless explicitly asked to batch related fixes.
 3. **P0.7 Supported Runtime Path Consistency (Harden / Verification Follow-up)**
 4. **P0.2 EKAP Public Tender Extraction**
 
-The first five items harden the already operational product. P0.2 expands source coverage after the current runtime is safer and more deterministic.
+The first three items harden the already operational product. P0.2 expands source coverage after the current runtime is safer and more deterministic.
 
 ## Active Critical Work Items
 
@@ -250,7 +250,6 @@ Detailed rationale and architecture hypotheses live in `NOTES.md`, Records 026â€
 
 - Which EKAP public request should be treated as the stable integration boundary: JSON/XHR, server-rendered HTML, or browser automation only as a last resort?
 - Should recurring scans be an in-process desktop responsibility or a separate CLI/OS-scheduled responsibility?
-- Should scan and re-evaluation be mutually exclusive through a process lock, a shared job manager, or both?
 
 ## Completed Foundation Items
 

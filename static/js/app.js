@@ -1380,8 +1380,12 @@ document.addEventListener("DOMContentLoaded", () => {
                     
                     if (data.last_run_status === "failed") {
                         showToast(`Tarama başarısız oldu: ${data.error_message || "Bilinmeyen hata"}`);
+                    } else if (data.last_run_status === "partial") {
+                        const res = data.result || {};
+                        showToast(`Tarama kısmen tamamlandı: ${res.successful_sources || 0} başarılı kaynak, ${res.failed_sources || 0} başarısız kaynak, ${res.processing_errors || 0} kayıt hatası, ${res.notification_errors || 0} bildirim hatası.`);
                     } else if (data.last_run_status === "success") {
-                        showToast("Tarama tamamlandı, ihaleler güncellendi.");
+                        const res = data.result || {};
+                        showToast(`Tarama tamamlandı: ${res.records_added || 0} yeni ihale eklendi.`);
                     }
                 }
             }
@@ -1405,8 +1409,12 @@ document.addEventListener("DOMContentLoaded", () => {
                     
                     if (data.last_run_status === "failed") {
                         showToast(`Yeniden değerlendirme başarısız oldu: ${data.error_message || "Bilinmeyen hata"}`);
+                    } else if (data.last_run_status === "partial") {
+                        const res = data.result || {};
+                        showToast(`Yeniden değerlendirme kısmen tamamlandı: ${res.records_added || 0} ihale güncellendi.`);
                     } else if (data.last_run_status === "success") {
-                        showToast("Yeniden değerlendirme tamamlandı, süzgeçler güncellendi.");
+                        const res = data.result || {};
+                        showToast(`Yeniden değerlendirme tamamlandı: ${res.records_added || 0} ihale değerlendirildi.`);
                     }
                 }
             }
