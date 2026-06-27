@@ -92,7 +92,7 @@ class Ekapv2Scraper(BaseScraper):
 
         date_start = None
         if self.last_success_at:
-            date_start = self.last_success_at.strftime("%d.%m.%Y")
+            date_start = self.last_success_at.strftime("%Y-%m-%dT%H:%M:%S")
             logger.info(f"EKAPv2 incremental sync aktif: {date_start} tarihinden sonra yayımlanan ihaleler aranıyor.")
         else:
             logger.info("EKAPv2 ilk tarama aktif: Teklif vermeye açık ihaleler aranıyor.")

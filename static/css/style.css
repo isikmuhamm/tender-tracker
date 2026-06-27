@@ -281,6 +281,20 @@ header h1 {
     animation: spin 1s linear infinite;
 }
 
+#btn-trigger {
+    background: var(--primary-glow);
+    border: 1px solid var(--primary-color);
+    color: var(--primary-color);
+    box-shadow: 0 0 10px var(--primary-glow);
+    font-weight: 600;
+}
+
+#btn-trigger:hover {
+    background: var(--primary-color);
+    color: #0b0f19;
+    box-shadow: 0 0 15px var(--primary-color);
+}
+
 @keyframes spin {
     100% { transform: rotate(360deg); }
 }

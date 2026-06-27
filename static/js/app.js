@@ -641,22 +641,19 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // --- Dynamic LLM Model Loader ---
-    async function loadLlmModels(provider, selectElement, currentModel, apiKey = "") {
+    async function loadLlmModels(provider, selectElement, currentModel, apiKey = "", baseUrl = "") {
         selectElement.innerHTML = "";
         
-        const url = `/api/models?provider=${provider}`;
+        let url = `/api/models?provider=${provider}`;
+        if (baseUrl) {
+            url += `&base_url=${encodeURIComponent(baseUrl)}`;
+        }
         const options = {};
         if (apiKey) {
             options.headers = {
                 "X-API-Key": apiKey
             };
         }
-        
-        const defaults = {
-            "gemini": ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash-exp"],
-            "openai": ["gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo"],
-            "claude": ["claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022", "claude-3-opus-20240229"]
-        };
         
         let models = [];
         try {
@@ -669,8 +666,12 @@ document.addEventListener("DOMContentLoaded", () => {
             console.error("Modeller yüklenirken hata:", err);
         }
         
-        if (models.length === 0) {
-            models = defaults[provider] || [];
+        if (models.length === 0 && !currentModel) {
+            const opt = document.createElement("option");
+            opt.value = "";
+            opt.textContent = "API Anahtarını Girip Yenileyin";
+            selectElement.appendChild(opt);
+            return;
         }
         
         if (currentModel && !models.includes(currentModel)) {
@@ -708,7 +709,7 @@ document.addEventListener("DOMContentLoaded", () => {
         btn.disabled = true;
         const icon = btn.querySelector("i");
         icon.classList.add("spin");
-        await loadLlmModels("openai", cfgOpenaiModel, cfgOpenaiModel.value, cfgOpenaiKey.value.trim());
+        await loadLlmModels("openai", cfgOpenaiModel, cfgOpenaiModel.value, cfgOpenaiKey.value.trim(), cfgOpenaiUrl.value.trim());
         icon.classList.remove("spin");
         btn.disabled = false;
         showToast("OpenAI model listesi güncellendi.");

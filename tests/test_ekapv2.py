@@ -186,7 +186,7 @@ def test_ekapv2_fetch_state_filters(mock_session_class):
     scraper.fetch()
     
     call_json_2 = mock_session.post.call_args_list[1][1]["json"]
-    assert call_json_2["ilanTarihSaatBaslangic"] == "27.06.2026"
+    assert call_json_2["ilanTarihSaatBaslangic"] == "2026-06-27T00:00:00"
     assert call_json_2["ihaleDurumIdList"] == [2]
 
 def test_ekapv2_details_link_determinism():

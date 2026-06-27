@@ -450,20 +450,16 @@ def save_config(
 @app.get("/api/models")
 def get_models(
     provider: str,
+    base_url: Optional[str] = None,
     x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
     current_user: User = Depends(get_current_user)
 ):
     """
     Belirtilen LLM sağlayıcısı ve API key için kullanılabilecek model listesini çeker.
     Eğer API key sağlanmamışsa, kayıtlı config.yaml dosyasından okumayı dener.
-    Eğer hata oluşursa veya API key geçersizse varsayılan model listesini döner.
+    Eğer hata oluşursa veya API key geçersizse boş liste döner.
     """
     import requests
-    defaults = {
-        "gemini": ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash-exp"],
-        "openai": ["gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo"],
-        "claude": ["claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022", "claude-3-opus-20240229"]
-    }
     
     api_key = x_api_key
     if not api_key:
@@ -479,7 +475,7 @@ def get_models(
                 pass
                 
     if not api_key:
-        return {"models": defaults.get(provider, [])}
+        return {"models": []}
         
     try:
         if provider == "gemini":
@@ -491,16 +487,18 @@ def get_models(
                 if models:
                     return {"models": models}
         elif provider == "openai":
-            base_url = "https://api.openai.com/v1"
-            config_path = get_data_path("config.yaml")
-            if os.path.exists(config_path):
-                try:
-                    with open(config_path, "r", encoding="utf-8") as f:
-                        cfg = yaml.safe_load(f) or {}
-                        base_url = cfg.get("settings", {}).get("llm_providers", {}).get("openai", {}).get("base_url", base_url)
-                except Exception:
-                    pass
-            url = f"{base_url.rstrip('/')}/models"
+            api_base = base_url
+            if not api_base:
+                api_base = "https://api.openai.com/v1"
+                config_path = get_data_path("config.yaml")
+                if os.path.exists(config_path):
+                    try:
+                        with open(config_path, "r", encoding="utf-8") as f:
+                            cfg = yaml.safe_load(f) or {}
+                            api_base = cfg.get("settings", {}).get("llm_providers", {}).get("openai", {}).get("base_url", api_base)
+                    except Exception:
+                        pass
+            url = f"{api_base.rstrip('/')}/models"
             res = requests.get(url, headers={"Authorization": f"Bearer {api_key}"}, timeout=5)
             if res.status_code == 200:
                 data = res.json()
@@ -525,7 +523,7 @@ def get_models(
             err_msg = err_msg.replace(api_key, "HIDDEN_KEY")
         logging.error(f"Modeller çekilirken hata: {err_msg}")
         
-    return {"models": defaults.get(provider, [])}
+    return {"models": []}
 
 # =========================================================
 # LOGS API
