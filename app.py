@@ -65,7 +65,7 @@ if not any(isinstance(h, logging.StreamHandler) and not isinstance(h, logging.Fi
     console_handler.setLevel(logging.INFO)
     logger.addHandler(console_handler)
 
-app = FastAPI(title="Tender Tracker API", version="1.0.0")
+app = FastAPI(title="Tender Tracker API", version="1.3.0")
 
 def run_startup_scan():
     """Uygulama başladığında otomatik taramayı arka planda başlatır."""
