@@ -185,12 +185,34 @@ document.addEventListener("DOMContentLoaded", () => {
         localStorage.removeItem("token");
     }
 
+    function parseJwt(token) {
+        try {
+            const base64Url = token.split('.')[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function(c) {
+                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+            }).join(''));
+            return JSON.parse(jsonPayload);
+        } catch (e) {
+            return null;
+        }
+    }
+
     function checkAuth() {
         const token = getToken();
         if (token) {
             loginContainer.classList.add("d-none");
             setupContainer.classList.add("d-none");
             appContainer.classList.remove("d-none");
+            
+            const payload = parseJwt(token);
+            if (payload && payload.sub) {
+                const usernameEl = document.getElementById("greeting-username");
+                if (usernameEl) {
+                    usernameEl.textContent = payload.sub;
+                }
+            }
+            
             initApp();
         } else {
             loginContainer.classList.remove("d-none");
