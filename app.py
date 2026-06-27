@@ -204,6 +204,60 @@ def trigger_scraper(current_user: User = Depends(get_current_user)):
     threading.Thread(target=run_scraper_bg).start()
     return {"success": True, "message": "Tarama işlemi arka planda başlatıldı."}
 
+@app.post("/api/tenders/re-evaluate")
+def re_evaluate_tenders(current_user: User = Depends(get_current_user)):
+    """Veritabanındaki mevcut ihaleleri yeni süzgeç kurallarına göre arka planda yeniden değerlendirir."""
+    def run_re_evaluation_bg():
+        from src.database import SessionLocal
+        from src.classifier import TenderClassifier
+        
+        db_session = SessionLocal()
+        try:
+            # 1. Config'i yükle
+            config_path = get_data_path("config.yaml")
+            if not os.path.exists(config_path):
+                logger.error("Yeniden değerlendirme hatası: config.yaml bulunamadı.")
+                return
+            with open(config_path, "r", encoding="utf-8") as f:
+                config_data = yaml.safe_load(f) or {}
+                
+            filters = config_data.get("filters", {})
+            custom_filters = filters.get("custom_llm_filters", [])
+            
+            # 2. Sınıflandırıcıyı başlat
+            classifier = TenderClassifier()
+            if not classifier.ai_enabled:
+                logger.warning("LLM aktif değil, yeniden değerlendirme yapılmadı.")
+                # Her ihalenin süzgecini temizleyelim
+                tenders = db_session.query(Tender).all()
+                for t in tenders:
+                    t.matched_custom_filters = None
+                db_session.commit()
+                return
+                
+            # 3. Veritabanından elenmemiş ihaleleri çek
+            tenders = db_session.query(Tender).filter(Tender.sector.isnot(None), Tender.sector != "Excluded").all()
+            logger.info(f"{len(tenders)} ihale akıllı süzgeçlerle yeniden değerlendiriliyor...")
+            
+            for t in tenders:
+                matched_ids = classifier.evaluate_custom_filters(
+                    t.title, t.summary, custom_filters, sector=t.sector
+                )
+                if matched_ids:
+                    t.matched_custom_filters = ",".join(matched_ids)
+                else:
+                    t.matched_custom_filters = None
+                db_session.commit()
+                
+            logger.info("İhalelerin akıllı süzgeç değerlendirmeleri başarıyla güncellendi.")
+        except Exception as e:
+            logger.error(f"İhaleler yeniden değerlendirilirken hata: {e}")
+        finally:
+            db_session.close()
+            
+    threading.Thread(target=run_re_evaluation_bg).start()
+    return {"success": True, "message": "Yeniden değerlendirme işlemi arka planda başlatıldı."}
+
 # =========================================================
 # CONFIG API
 # =========================================================

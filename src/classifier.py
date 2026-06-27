@@ -116,7 +116,7 @@ class TenderClassifier:
             logger.error(f"LLM sınıflandırma hatası: {e}")
             return None
 
-    def evaluate_custom_filters(self, title: str, summary: str, custom_filters: list) -> list:
+    def evaluate_custom_filters(self, title: str, summary: str, custom_filters: list, sector: str = None) -> list:
         """
         İhaleyi kullanıcının özel tanımladığı akıllı süzgeçlere (custom_llm_filters) göre LLM ile değerlendirir.
         Dönen çıktı: Eşleşen süzgeçlerin ID listesi (örn: ["metro_plc"])
@@ -124,7 +124,16 @@ class TenderClassifier:
         if not self.ai_enabled or not custom_filters:
             return []
             
-        active_filters = [f for f in custom_filters if f.get("enabled", True)]
+        # Filtreleri sektör bazlı sınırla (prior sector filter)
+        active_filters = []
+        for f in custom_filters:
+            if not f.get("enabled", True):
+                continue
+            target_sec = f.get("target_sector", "all")
+            if target_sec != "all" and sector and target_sec != sector:
+                continue
+            active_filters.append(f)
+            
         if not active_filters:
             return []
             

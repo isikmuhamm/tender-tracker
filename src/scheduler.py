@@ -116,7 +116,7 @@ class TenderBotOrchestrator:
                         matched_filters_str = None
                         if sector and sector != "Excluded" and custom_filters:
                             matched_ids = self.classifier.evaluate_custom_filters(
-                                item["title"], item["summary"], custom_filters
+                                item["title"], item["summary"], custom_filters, sector=sector
                             )
                             if matched_ids:
                                 matched_filters_str = ",".join(matched_ids)

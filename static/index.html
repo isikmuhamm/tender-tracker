@@ -277,7 +277,10 @@
                         <div id="tab-filters" class="config-tab-content glass-card d-none">
                             <div class="content-header">
                                 <h3>Özel Akıllı Süzgeçler (LLM Prompts)</h3>
-                                <button type="button" id="btn-add-filter" class="btn-small-primary"><i class="fa-solid fa-plus"></i> Süzgeç Ekle</button>
+                                <div style="display: flex; gap: 8px;">
+                                    <button type="button" id="btn-reevaluate-filters" class="btn-small" style="background: rgba(56, 189, 248, 0.1); border: 1px solid var(--primary-color); color: var(--primary-color); padding: 7px 12px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 6px;"><i class="fa-solid fa-rotate"></i> Yeniden Değerlendir</button>
+                                    <button type="button" id="btn-add-filter" class="btn-small-primary"><i class="fa-solid fa-plus"></i> Süzgeç Ekle</button>
+                                </div>
                             </div>
                             <p class="section-desc">Geniş sektör filtresini geçen ihaleleri, kendi belirleyeceğiniz özel LLM süzgeçleriyle tarayıp sadece ilgilendiğiniz kelimeleri ayıklayabilirsiniz.</p>
                             <div class="info-alert" style="margin-bottom: 15px; padding: 12px 15px; background: rgba(56, 189, 248, 0.08); border-left: 4px solid var(--primary-color); border-radius: 6px; font-size: 13px; color: var(--text-primary); line-height: 1.5;">
@@ -453,6 +456,12 @@
                 <div class="form-group">
                     <label for="modal-filter-name">Süzgeç İsmi</label>
                     <input type="text" id="modal-filter-name" required placeholder="Örn: Metro & PLC">
+                </div>
+                <div class="form-group">
+                    <label for="modal-filter-sector">Geçerli Olacağı Sektör (Öncelikli Süzgeç)</label>
+                    <select id="modal-filter-sector" style="width: 100%; padding: 11px 14px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); font-family: inherit; font-size: 14px; outline: none; box-sizing: border-box;">
+                        <option value="all">Tüm Sektörler</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label for="modal-filter-prompt">Yapay Zeka Yönergesi (Prompt)</label>

@@ -102,6 +102,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const modalFilterId = document.getElementById("modal-filter-id");
     const modalFilterName = document.getElementById("modal-filter-name");
     const modalFilterPrompt = document.getElementById("modal-filter-prompt");
+    const modalFilterSector = document.getElementById("modal-filter-sector");
+    const btnReevaluateFilters = document.getElementById("btn-reevaluate-filters");
     
     // Local state variables
     let activePanel = "panel-tenders";
@@ -768,6 +770,16 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    function populateFilterSectorDropdown() {
+        modalFilterSector.innerHTML = '<option value="all">Tüm Sektörler</option>';
+        Object.keys(localSectors).forEach(sector => {
+            const opt = document.createElement("option");
+            opt.value = sector;
+            opt.textContent = sector;
+            modalFilterSector.appendChild(opt);
+        });
+    }
+
     // --- Custom Filters Sub-Module ---
     function renderCustomFiltersTable() {
         customFiltersList.innerHTML = "";
@@ -779,7 +791,7 @@ document.addEventListener("DOMContentLoaded", () => {
         localCustomFilters.forEach((f, idx) => {
             const tr = document.createElement("tr");
             tr.innerHTML = `
-                <td><strong>${f.name || ""}</strong><br><small style="color: var(--text-secondary)">ID: ${f.id}</small></td>
+                <td><strong>${f.name || ""}</strong><br><small style="color: var(--text-secondary)">ID: ${f.id} | Sektör: ${f.target_sector === "all" || !f.target_sector ? "Tüm Sektörler" : f.target_sector}</small></td>
                 <td>${f.prompt_instruction || ""}</td>
                 <td style="text-align: center;">
                     <label class="switch">
@@ -809,10 +821,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 const idx = parseInt(targetBtn.getAttribute("data-index"));
                 const f = localCustomFilters[idx];
                 
+                populateFilterSectorDropdown();
                 modalFilterOrigId.value = f.id;
                 modalFilterId.value = f.id;
                 modalFilterName.value = f.name;
                 modalFilterPrompt.value = f.prompt_instruction || "";
+                modalFilterSector.value = f.target_sector || "all";
                 
                 filterModalTitle.textContent = "Akıllı Süzgeç Düzenle";
                 openModal(filterModal);
@@ -831,10 +845,12 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     btnAddFilter.addEventListener("click", () => {
+        populateFilterSectorDropdown();
         modalFilterOrigId.value = "";
         modalFilterId.value = "filter_" + Math.random().toString(36).substr(2, 6);
         modalFilterName.value = "";
         modalFilterPrompt.value = "";
+        modalFilterSector.value = "all";
         filterModalTitle.textContent = "Yeni Akıllı Süzgeç Ekle";
         openModal(filterModal);
     });
@@ -845,6 +861,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const newId = modalFilterId.value.trim();
         const newName = modalFilterName.value.trim();
         const newPrompt = modalFilterPrompt.value.trim();
+        const newSector = modalFilterSector.value;
         
         if (!newId || !newName) return;
         
@@ -859,12 +876,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 localCustomFilters[idx].id = newId;
                 localCustomFilters[idx].name = newName;
                 localCustomFilters[idx].prompt_instruction = newPrompt;
+                localCustomFilters[idx].target_sector = newSector;
             }
         } else {
             localCustomFilters.push({
                 id: newId,
                 name: newName,
                 prompt_instruction: newPrompt,
+                target_sector: newSector,
                 enabled: true
             });
         }
@@ -872,6 +891,23 @@ document.addEventListener("DOMContentLoaded", () => {
         closeModal(filterModal);
         renderCustomFiltersTable();
         await saveConfigToServer(false);
+    });
+
+    // Re-evaluate filters button listener
+    btnReevaluateFilters.addEventListener("click", async () => {
+        btnReevaluateFilters.disabled = true;
+        const originalText = btnReevaluateFilters.innerHTML;
+        btnReevaluateFilters.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Yeniden Değerlendiriliyor...';
+        
+        const response = await apiRequest("/api/tenders/re-evaluate", { method: "POST" });
+        if (response && response.ok) {
+            showToast("Yeniden değerlendirme arka planda başlatıldı. Tamamlandığında ihaleler güncellenecektir.");
+        } else {
+            showToast("Yeniden değerlendirme başlatılamadı!");
+        }
+        
+        btnReevaluateFilters.disabled = false;
+        btnReevaluateFilters.innerHTML = originalText;
     });
 
     // --- Sectors Accordion Sub-Module ---
