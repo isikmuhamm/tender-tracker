@@ -1,7 +1,7 @@
 import logging
 from typing import List, Dict, Any
 import requests
-from .base import BaseScraper
+from .base import BaseScraper, SourceFetchError, SourceParseError
 
 logger = logging.getLogger(__name__)
 
@@ -34,45 +34,46 @@ class IlanGovTrScraper(BaseScraper):
             r.raise_for_status()
             return r.json()
         except Exception as e:
-            logger.error(f"ilan.gov.tr API sorgulama hatası: {e}")
-            return {}
+            raise SourceFetchError(f"ilan.gov.tr API sorgulama hatası: {e}")
 
     def parse(self, raw_data: dict) -> List[Dict[str, Any]]:
         if not raw_data or "result" not in raw_data or "ads" not in raw_data["result"]:
-            logger.warning("ilan.gov.tr API yanıtı geçersiz veya boş.")
-            return []
+            raise SourceParseError("ilan.gov.tr API yanıtı geçersiz veya boş.")
             
-        ads = raw_data["result"]["ads"]
-        items = []
-        
-        for ad in ads:
-            ad_id = ad.get("id")
-            title = ad.get("title")
+        try:
+            ads = raw_data["result"]["ads"]
+            items = []
             
-            if not ad_id or not title:
-                continue
+            for ad in ads:
+                ad_id = ad.get("id")
+                title = ad.get("title")
                 
-            link = f"https://www.ilan.gov.tr/ilan/{ad_id}"
-            ad_no = ad.get("adNo", "")
-            advertiser = ad.get("advertiserName", "")
-            
-            summary = f"İlan No: {ad_no}"
-            if advertiser:
-                summary += f" | Yayınlayan: {advertiser}"
+                if not ad_id or not title:
+                    continue
+                    
+                link = f"https://www.ilan.gov.tr/ilan/{ad_id}"
+                ad_no = ad.get("adNo", "")
+                advertiser = ad.get("advertiserName", "")
                 
-            items.append({
-                "link": link,
-                "title": title,
-                "summary": summary,
-                "category": "İhale İlanı",
-                "source": self.source_name
-            })
-            
-        # Çift kayıtları (aynı linki) kaldır
-        unique_items = {}
-        for item in items:
-            unique_items[item["link"]] = item
-            
-        result = list(unique_items.values())
-        logger.info(f"ilan.gov.tr API ayrıştırıldı. Toplam {len(result)} benzersiz ilan bulundu.")
-        return result
+                summary = f"İlan No: {ad_no}"
+                if advertiser:
+                    summary += f" | Yayınlayan: {advertiser}"
+                    
+                items.append({
+                    "link": link,
+                    "title": title,
+                    "summary": summary,
+                    "category": "İhale İlanı",
+                    "source": self.source_name
+                })
+                
+            # Çift kayıtları (aynı linki) kaldır
+            unique_items = {}
+            for item in items:
+                unique_items[item["link"]] = item
+                
+            result = list(unique_items.values())
+            logger.info(f"ilan.gov.tr API ayrıştırıldı. Toplam {len(result)} benzersiz ilan bulundu.")
+            return result
+        except Exception as e:
+            raise SourceParseError(f"ilan.gov.tr API ayrıştırma hatası: {e}")

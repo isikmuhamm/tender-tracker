@@ -103,3 +103,25 @@ def test_status_scenarios(mock_init, mock_session_class, mock_db_setup, tmp_path
     assert result4["successful_sources"] == 1
     assert result4["processing_errors"] == 1
     assert result4["records_added"] == 1
+
+    # 5. Scenario: All retrieved items fail to process (records_added = 0, processing_errors > 0). Expected: failed
+    scraper_all_fail = MagicMock()
+    scraper_all_fail.source_name = "yatirimlar"
+    scraper_all_fail.get_new_items.return_value = [
+        {"link": "http://fail2.com", "title": "Fail Title 2", "summary": "Sum", "category": "Cat", "source": "yatirimlar"}
+    ]
+
+    orch5 = TenderBotOrchestrator(config_path=str(config_file))
+    orch5.scrapers = [scraper_all_fail]
+    orch5.notifiers = []
+
+    mock_classifier2 = MagicMock()
+    mock_classifier2.classify.side_effect = Exception("Classification failed completely")
+
+    with patch("src.scheduler.TenderClassifier", return_value=mock_classifier2):
+        result5 = orch5.run_once()
+
+    assert result5["status"] == "failed"
+    assert result5["successful_sources"] == 1
+    assert result5["processing_errors"] == 1
+    assert result5["records_added"] == 0

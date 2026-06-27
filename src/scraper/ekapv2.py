@@ -7,22 +7,28 @@ import time
 import json
 import warnings
 import urllib3
+import yaml
 from typing import List, Dict, Any
-from urllib.parse import quote
+from urllib.parse import urlencode
 import requests
 from requests.adapters import HTTPAdapter
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives import padding as crypto_padding
-from .base import BaseScraper
+from .base import BaseScraper, SourceFetchError, SourceParseError
 
 logger = logging.getLogger(__name__)
 
 class TLSAdapter(HTTPAdapter):
     """EKAPv2'nin SSL/TLS el sıkışma gereksinimleri için özel adaptör."""
+    def __init__(self, verify_secure=True, *args, **kwargs):
+        self.verify_secure = verify_secure
+        super().__init__(*args, **kwargs)
+
     def init_poolmanager(self, *args, **kwargs):
         ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
+        if not self.verify_secure:
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
         ctx.set_ciphers('DEFAULT@SECLEVEL=1')
         ctx.minimum_version = ssl.TLSVersion.TLSv1_2
         kwargs['ssl_context'] = ctx
@@ -69,93 +75,164 @@ class Ekapv2Scraper(BaseScraper):
 
     def fetch(self) -> str:
         logger.info(f"EKAPv2 ihaleleri çekiliyor: {self.url}")
-        logger.warning("TLS verification bypassed for Ekapv2Scraper for compatibility.")
         
-        session = requests.Session()
-        session.headers.update(self.headers)
-        try:
-            session.headers.update(self._generate_security_headers())
-        except Exception as e:
-            logger.error(f"EKAPv2 güvenlik başlıkları oluşturulamadı: {e}")
-            return ""
+        # 1. Güvenli olmayan TLS fallback ayarını kontrol et (ENV > config.yaml > default)
+        insecure_fallback = os.getenv("EKAP_INSECURE_FALLBACK", "false").lower() in ("true", "1", "yes")
+        if not insecure_fallback:
+            from src.database import get_data_path
+            cfg_path = get_data_path("config.yaml")
+            if os.path.exists(cfg_path):
+                try:
+                    with open(cfg_path, "r", encoding="utf-8") as f:
+                        config = yaml.safe_load(f)
+                        if config and "settings" in config:
+                            insecure_fallback = config["settings"].get("ekap_insecure_fallback", False)
+                except Exception:
+                    pass
+
+        all_tenders = []
+        total_count = 0
+        skip = 0
+        take = 40
+        max_records = 200
+        
+        # 2. TLS Adapter kurulumunu gerçekleştir (varsayılan olarak sertifika doğrulaması açıktır)
+        def make_session(verify_secure=True):
+            s = requests.Session()
+            s.headers.update(self.headers)
+            s.verify = verify_secure
+            s.mount("https://ekapv2.kik.gov.tr", TLSAdapter(verify_secure=verify_secure))
+            return s
             
-        session.verify = False
-        session.mount("https://ekapv2.kik.gov.tr", TLSAdapter())
-        
-        # En güncel ihaleleri çekmek için arama parametreleri
-        api_params = {
-            "searchText": "",
-            "filterType": None,
-            "ikNdeAra": True,
-            "ihaleAdindaAra": True,
-            "ihaleIlanindaAra": True,
-            "teknikSartnamedeAra": True,
-            "idariSartnamedeAra": True,
-            "benzerIsMaddesindeAra": True,
-            "isinYapilacagiYerMaddesindeAra": True,
-            "nitelikTurMiktarMaddesindeAra": True,
-            "ihaleBilgilerindeAra": True,
-            "sozlesmeTasarisindaAra": True,
-            "teklifCetvelindeAra": True,
-            "searchType": "GirdigimGibi",
-            "iknYili": None,
-            "iknSayi": None,
-            "ihaleTarihSaatBaslangic": None,
-            "ihaleTarihSaatBitis": None,
-            "ilanTarihSaatBaslangic": None,
-            "ilanTarihSaatBitis": None,
-            "yasaKapsami4734List": [],
-            "ihaleTuruIdList": [],
-            "ihaleUsulIdList": [],
-            "ihaleUsulAltIdList": [],
-            "ihaleIlIdList": [],
-            "ihaleDurumIdList": [],
-            "idareIdList": [],
-            "ihaleIlanTuruIdList": [],
-            "teklifTuruIdList": [],
-            "asiriDusukTeklifIdList": [],
-            "istisnaMaddeIdList": [],
-            "okasBransKodList": [],
-            "okasBransAdiList": [],
-            "titubbKodList": [],
-            "gmdnKodList": [],
-            "eIhale": None,
-            "eEksiltmeYapilacakMi": None,
-            "ortakAlimMi": None,
-            "kismiTeklifMi": None,
-            "fiyatDisiUnsurVarmi": None,
-            "ekonomikVeMaliYeterlilikBelgeleriIsteniyorMu": None,
-            "meslekiTeknikYeterlilikBelgeleriIsteniyorMu": None,
-            "isDeneyimiGosterenBelgelerIsteniyorMu": None,
-            "yerliIstekliyeFiyatAvantajiUgulaniyorMu": None,
-            "yabanciIsteklilereIzinVeriliyorMu": None,
-            "alternatifTeklifVerilebilirMi": None,
-            "konsorsiyumKatilabilirMi": None,
-            "altYukleniciCalistirilabilirMi": None,
-            "fiyatFarkiVerilecekMi": None,
-            "avansVerilecekMi": None,
-            "cerceveAnlasmaMi": None,
-            "personelCalistirilmasinaDayaliMi": None,
-            "orderBy": "ihaleTarihi",
-            "siralamaTipi": "desc",
-            "paginationSkip": 0,
-            "paginationTake": 20
-        }
-        
-        try:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore", urllib3.exceptions.InsecureRequestWarning)
+        session = make_session(verify_secure=True)
+        is_fallback_active = False
+
+        while skip < max_records:
+            try:
+                session.headers.update(self._generate_security_headers())
+            except Exception as e:
+                raise SourceFetchError(f"EKAPv2 güvenlik başlıkları oluşturulamadı: {e}")
+                
+            api_params = {
+                "searchText": "",
+                "filterType": None,
+                "ikNdeAra": True,
+                "ihaleAdindaAra": True,
+                "ihaleIlanindaAra": True,
+                "teknikSartnamedeAra": True,
+                "idariSartnamedeAra": True,
+                "benzerIsMaddesindeAra": True,
+                "isinYapilacagiYerMaddesindeAra": True,
+                "nitelikTurMiktarMaddesindeAra": True,
+                "ihaleBilgilerindeAra": True,
+                "sozlesmeTasarisindaAra": True,
+                "teklifCetvelindeAra": True,
+                "searchType": "GirdigimGibi",
+                "iknYili": None,
+                "iknSayi": None,
+                "ihaleTarihSaatBaslangic": None,
+                "ihaleTarihSaatBitis": None,
+                "ilanTarihSaatBaslangic": None,
+                "ilanTarihSaatBitis": None,
+                "yasaKapsami4734List": [],
+                "ihaleTuruIdList": [],
+                "ihaleUsulIdList": [],
+                "ihaleUsulAltIdList": [],
+                "ihaleIlIdList": [],
+                "ihaleDurumIdList": [],
+                "idareIdList": [],
+                "ihaleIlanTuruIdList": [],
+                "teklifTuruIdList": [],
+                "asiriDusukTeklifIdList": [],
+                "istisnaMaddeIdList": [],
+                "okasBransKodList": [],
+                "okasBransAdiList": [],
+                "titubbKodList": [],
+                "gmdnKodList": [],
+                "eIhale": None,
+                "eEksiltmeYapilacakMi": None,
+                "ortakAlimMi": None,
+                "kismiTeklifMi": None,
+                "fiyatDisiUnsurVarmi": None,
+                "ekonomikVeMaliYeterlilikBelgeleriIsteniyorMu": None,
+                "meslekiTeknikYeterlilikBelgeleriIsteniyorMu": None,
+                "isDeneyimiGosterenBelgelerIsteniyorMu": None,
+                "yerliIstekliyeFiyatAvantajiUgulaniyorMu": None,
+                "yabanciIsteklilereIzinVeriliyorMu": None,
+                "alternatifTeklifVerilebilirMi": None,
+                "konsorsiyumKatilabilirMi": None,
+                "altYukleniciCalistirilabilirMi": None,
+                "fiyatFarkiVerilecekMi": None,
+                "avansVerilecekMi": None,
+                "cerceveAnlasmaMi": None,
+                "personelCalistirilmasinaDayaliMi": None,
+                "orderBy": "ihaleTarihi",
+                "siralamaTipi": "desc",
+                "paginationSkip": skip,
+                "paginationTake": take
+            }
+            
+            try:
+                # 3. İsteği gönder
                 r = session.post(self.url, json=api_params, timeout=30)
-            r.raise_for_status()
-            logger.info(f"EKAPv2 API çağrısı başarılı. HTTP Durumu: {r.status_code}")
-            return r.text
-        except Exception as e:
-            logger.error(f"EKAPv2 API bağlantı hatası: {e}")
-            return ""
+                r.raise_for_status()
+                data = r.json()
+            except requests.exceptions.SSLError as ssl_err:
+                # SSL Hatası durumunda, fallback ayarı açıksa güvensiz moda geçerek tekrar dene
+                if insecure_fallback and not is_fallback_active:
+                    logger.warning("EKAPv2 standard SSL verification failed. Falling back to insecure compatibility mode as configured.")
+                    is_fallback_active = True
+                    session = make_session(verify_secure=False)
+                    # Warnings modülüyle insecure request uyarılarını sessize al
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("ignore", urllib3.exceptions.InsecureRequestWarning)
+                        try:
+                            session.headers.update(self._generate_security_headers())
+                            r = session.post(self.url, json=api_params, timeout=30)
+                            r.raise_for_status()
+                            data = r.json()
+                        except Exception as retry_err:
+                            if skip == 0:
+                                raise SourceFetchError(f"EKAPv2 API bağlantı hatası (Fallback): {retry_err}")
+                            else:
+                                break
+                else:
+                    if skip == 0:
+                        raise SourceFetchError(f"EKAPv2 SSL verification failed: {ssl_err}. Fallback is disabled.")
+                    else:
+                        break
+            except Exception as e:
+                # Diğer HTTP/bağlantı hataları
+                if skip == 0:
+                    raise SourceFetchError(f"EKAPv2 API bağlantı hatası: {e}")
+                else:
+                    logger.warning(f"EKAPv2 API sonraki sayfayı çekerken hata aldı: {e}")
+                    break
+                    
+            tenders = data.get("list", [])
+            total_count = data.get("totalCount", 0)
+            
+            if not tenders:
+                break
+                
+            all_tenders.extend(tenders)
+            
+            if len(all_tenders) >= total_count:
+                break
+                
+            skip += take
+            # Sunucuyu yormamak için kısa bekleme süresi
+            time.sleep(0.5)
+            
+        logger.info(f"EKAPv2 API taraması bitti. Toplam çekilen: {len(all_tenders)}, Toplam sunucudaki: {total_count}")
+        if is_fallback_active:
+            logger.warning("EKAPv2 ran in Degraded/Compatibility mode bypassing TLS verification.")
+            
+        return json.dumps({"list": all_tenders, "totalCount": total_count})
 
     def parse(self, raw_data: str) -> List[Dict[str, Any]]:
         if not raw_data:
-            return []
+            raise SourceParseError("EKAPv2 boş veri döndü.")
         try:
             data = json.loads(raw_data)
             tenders = data.get("list", [])
@@ -167,7 +244,7 @@ class Ekapv2Scraper(BaseScraper):
                     continue
                 
                 title = tender.get("ihaleAdi", "")
-                link = f"https://ekap.kik.gov.tr/EKAP/Ortak/IhaleArama/IhaleArama.aspx?IKN={quote(ikn)}"
+                link = f"https://ekap.kik.gov.tr/EKAP/Ortak/IhaleArama/IhaleArama.aspx?{urlencode({'IKN': ikn})}"
                 category = tender.get("ihaleTipAciklama", "Diğer")
                 
                 authority = tender.get("idareAdi", "")
@@ -203,5 +280,4 @@ class Ekapv2Scraper(BaseScraper):
             logger.info(f"EKAPv2 İhaleleri ayrıştırıldı. Toplam {len(items)} ihale bulundu.")
             return items
         except Exception as e:
-            logger.error(f"EKAPv2 ayrıştırma hatası: {e}")
-            return []
+            raise SourceParseError(f"EKAPv2 ayrıştırma hatası: {e}")

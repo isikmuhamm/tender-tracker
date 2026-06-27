@@ -185,6 +185,9 @@ class TenderBotOrchestrator:
         # Durumu belirle
         if successful_sources == 0 and failed_sources > 0:
             status_str = "failed"
+        elif records_added == 0 and processing_errors > 0 and failed_sources == 0:
+            # Tüm kaynaklara erişildi fakat eklenmeye çalışılan tüm kayıtlar hata verdi (hiçbir kayıt eklenemedi)
+            status_str = "failed"
         elif failed_sources > 0 or processing_errors > 0 or notification_errors > 0:
             status_str = "partial"
         else:

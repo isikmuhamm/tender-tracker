@@ -1,6 +1,14 @@
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any
 
+class SourceFetchError(Exception):
+    """Veri çekme işlemi sırasında hata oluştuğunda fırlatılır."""
+    pass
+
+class SourceParseError(Exception):
+    """Veri ayrıştırma işlemi sırasında hata oluştuğunda fırlatılır."""
+    pass
+
 class BaseScraper(ABC):
     """
     Tüm ihale kazıyıcı adaptörler için temel soyut sınıf.

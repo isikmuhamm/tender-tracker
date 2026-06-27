@@ -3,7 +3,7 @@ from typing import List, Dict, Any
 from urllib.parse import urljoin
 import requests
 from bs4 import BeautifulSoup
-from .base import BaseScraper
+from .base import BaseScraper, SourceFetchError, SourceParseError
 
 logger = logging.getLogger(__name__)
 
@@ -27,56 +27,53 @@ class DmoScraper(BaseScraper):
             r.raise_for_status()
             return r.text
         except Exception as e:
-            logger.error(f"DMO İhale Listesi veri çekme hatası: {e}")
-            return ""
+            raise SourceFetchError(f"DMO İhale Listesi veri çekme hatası: {e}")
 
     def parse(self, raw_data: str) -> List[Dict[str, Any]]:
         if not raw_data:
-            return []
+            raise SourceParseError("DMO İhale Listesi boş veri döndü.")
         
-        soup = BeautifulSoup(raw_data, "html.parser")
-        items = []
-        rows = soup.find_all("tr")
-        
-        for tr in rows:
-            a_elem = tr.find("a", href=lambda h: h and '/Ihale/Detay/' in h)
-            if not a_elem:
-                continue
-                
-            tds = tr.find_all("td")
-            if len(tds) < 8:
-                continue
-                
-            link = urljoin("https://www.dmo.gov.tr", a_elem["href"])
-            tender_id = tds[1].get_text(strip=True)
-            title = tds[3].get_text(strip=True)
-            category = tds[4].get_text(strip=True)
-            start_date = tds[5].get_text(strip=True)
-            end_date = tds[6].get_text(strip=True)
-            explanation = tds[7].get_text(strip=True)
+        try:
+            soup = BeautifulSoup(raw_data, "html.parser")
+            items = []
+            rows = soup.find_all("tr")
             
-            # Başlıktaki zeyilname uyarılarını temizle veya düzelt
-            if explanation and title.startswith(explanation):
-                # Başlık zaten durumu içeriyorsa tekrarı engellemek için temizlik yapılabilir
-                pass
+            for tr in rows:
+                a_elem = tr.find("a", href=lambda h: h and '/Ihale/Detay/' in h)
+                if not a_elem:
+                    continue
+                    
+                tds = tr.find_all("td")
+                if len(tds) < 8:
+                    continue
+                    
+                link = urljoin("https://www.dmo.gov.tr", a_elem["href"])
+                tender_id = tds[1].get_text(strip=True)
+                title = tds[3].get_text(strip=True)
+                category = tds[4].get_text(strip=True)
+                start_date = tds[5].get_text(strip=True)
+                end_date = tds[6].get_text(strip=True)
+                explanation = tds[7].get_text(strip=True)
                 
-            summary = f"İhale No: {tender_id} | Yayın: {start_date} | Bitiş: {end_date}"
-            if explanation:
-                summary += f" | Durum: {explanation}"
+                summary = f"İhale No: {tender_id} | Yayın: {start_date} | Bitiş: {end_date}"
+                if explanation:
+                    summary += f" | Durum: {explanation}"
+                    
+                items.append({
+                    "link": link,
+                    "title": title,
+                    "summary": summary,
+                    "category": category,
+                    "source": self.source_name
+                })
                 
-            items.append({
-                "link": link,
-                "title": title,
-                "summary": summary,
-                "category": category,
-                "source": self.source_name
-            })
-            
-        # Çift kayıtları (aynı linki) kaldır
-        unique_items = {}
-        for item in items:
-            unique_items[item["link"]] = item
-            
-        result = list(unique_items.values())
-        logger.info(f"DMO İhaleleri ayrıştırıldı. Toplam {len(result)} benzersiz ihale bulundu.")
-        return result
+            # Çift kayıtları (aynı linki) kaldır
+            unique_items = {}
+            for item in items:
+                unique_items[item["link"]] = item
+                
+            result = list(unique_items.values())
+            logger.info(f"DMO İhaleleri ayrıştırıldı. Toplam {len(result)} benzersiz ihale bulundu.")
+            return result
+        except Exception as e:
+            raise SourceParseError(f"DMO İhale Listesi veri ayrıştırma hatası: {e}")
