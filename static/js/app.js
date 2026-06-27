@@ -1,6 +1,26 @@
 document.addEventListener("DOMContentLoaded", () => {
     const API_BASE = "";
 
+    // Escape and sanitization helpers for XSS protection
+    function escapeHtml(str) {
+        if (str === null || str === undefined) return "";
+        return String(str)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    function safeLink(link) {
+        if (!link) return "#";
+        const clean = String(link).trim().toLowerCase();
+        if (clean.startsWith("http://") || clean.startsWith("https://")) {
+            return link;
+        }
+        return "#";
+    }
+
     // DOM Elements
     const loginContainer = document.getElementById("login-container");
     const setupContainer = document.getElementById("setup-container");
