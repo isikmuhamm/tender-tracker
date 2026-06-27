@@ -35,6 +35,7 @@ def build():
         f"--add-data=sectors.yaml{sep}.",
         # console modda çalıştırıyoruz ki kullanıcı logları görebilsin
         "--console",
+        "--icon=app_icon.ico",
         # Uvicorn ve FastAPI için gizli importlar
         "--hidden-import=uvicorn.loops.auto",
         "--hidden-import=uvicorn.loops.asyncio",

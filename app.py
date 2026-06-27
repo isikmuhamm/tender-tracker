@@ -143,6 +143,13 @@ def index():
         return FileResponse(index_path)
     return {"message": "Arayüz dosyaları bulunamadı. Lütfen static/index.html'i yükleyin."}
 
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    favicon_path = os.path.join(static_dir, "favicon.ico")
+    if os.path.exists(favicon_path):
+        return FileResponse(favicon_path)
+    return {"message": "Favicon not found"}
+
 # =========================================================
 # AUTH API
 # =========================================================

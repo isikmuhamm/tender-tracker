@@ -44,7 +44,7 @@ document.addEventListener("DOMContentLoaded", () => {
     
     // Tenders elements
     const tendersGrid = document.getElementById("tenders-grid");
-    const tenderCount = document.getElementById("tender-count");
+    const tenderStatsContent = document.getElementById("tender-stats-content");
     const filterSector = document.getElementById("filter-sector");
     const filterCustom = document.getElementById("filter-custom");
     const filterSource = document.getElementById("filter-source");
@@ -405,6 +405,12 @@ document.addEventListener("DOMContentLoaded", () => {
         const targetPanel = document.getElementById(targetPanelId);
         if (targetPanel) targetPanel.classList.remove("d-none");
         
+        // Reset unsaved theme preview if leaving config panel
+        if (targetPanelId !== "panel-config" && loadedConfig && loadedConfig.config && loadedConfig.config.settings) {
+            const savedTheme = loadedConfig.config.settings.theme || "cyan";
+            applyTheme(savedTheme);
+        }
+        
         // Update header title
         if (targetNavItem) {
             headerTitle.textContent = targetNavItem.textContent.trim();
@@ -518,7 +524,11 @@ document.addEventListener("DOMContentLoaded", () => {
             );
         }
         
-        tenderCount.textContent = itemsToRender.length;
+        if (data.total > itemsToRender.length) {
+            tenderStatsContent.innerHTML = `Toplam <strong>${data.total}</strong> ihaleden <strong>${itemsToRender.length}</strong> ihale gösteriliyor.`;
+        } else {
+            tenderStatsContent.innerHTML = `Toplam <strong>${data.total}</strong> ihale gösteriliyor.`;
+        }
         renderTenders(itemsToRender);
         
         // Toggle Load More button visibility
