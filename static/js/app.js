@@ -111,6 +111,8 @@ document.addEventListener("DOMContentLoaded", () => {
     let localCustomFilters = [];
     let localSectors = {};
     let globalFiltersEnabled = true;
+    let lastTenderCount = null;
+    let lastErrorWarningCount = null;
 
     // Theme configuration
     let selectedThemeKey = "cyan";
@@ -407,10 +409,19 @@ document.addEventListener("DOMContentLoaded", () => {
         // Trigger panel load actions
         activePanel = targetPanelId;
         if (targetPanelId === "panel-tenders") {
+            const badge = document.getElementById("badge-tenders");
+            if (badge) {
+                badge.classList.add("d-none");
+                badge.textContent = "0";
+            }
             loadTenders();
         } else if (targetPanelId === "panel-config") {
             loadConfigFromServer();
         } else if (targetPanelId === "panel-logs") {
+            const badge = document.getElementById("badge-logs");
+            if (badge) {
+                badge.classList.add("d-none");
+            }
             loadLogs();
         }
     }
@@ -457,6 +468,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!response || !response.ok) return;
         
         const data = await response.json();
+        lastTenderCount = data.total;
         let items = data.items;
         
         // Client-side Custom LLM Filter
@@ -1276,6 +1288,14 @@ document.addEventListener("DOMContentLoaded", () => {
         const data = await response.json();
         logsViewer.textContent = data.logs;
         logsViewer.scrollTop = logsViewer.scrollHeight;
+        
+        const logLines = (data.logs || "").split("\n");
+        lastErrorWarningCount = logLines.filter(line => 
+            line.includes("ERROR") || 
+            line.includes("WARNING") || 
+            line.includes("hata") || 
+            line.includes("Hata")
+        ).length;
     }
 
     btnRefreshLogs.addEventListener("click", loadLogs);
@@ -1305,6 +1325,56 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
+    async function checkStatusUpdates() {
+        if (!loginContainer.classList.contains("d-none")) return;
+        
+        try {
+            // 1. Check Tenders Count
+            const tendersRes = await fetch(`${API_BASE}/api/tenders?limit=1`, {
+                headers: { "Authorization": `Bearer ${localStorage.getItem("token")}` }
+            });
+            if (tendersRes.ok) {
+                const tendersData = await tendersRes.json();
+                const currentTotal = tendersData.total;
+                if (lastTenderCount !== null && currentTotal > lastTenderCount) {
+                    const badge = document.getElementById("badge-tenders");
+                    if (badge && activePanel !== "panel-tenders") {
+                        badge.textContent = currentTotal - lastTenderCount;
+                        badge.classList.remove("d-none");
+                    }
+                } else if (activePanel === "panel-tenders") {
+                    lastTenderCount = currentTotal;
+                }
+            }
+            
+            // 2. Check Logs Errors/Warnings Count
+            const logsRes = await fetch(`${API_BASE}/api/logs`, {
+                headers: { "Authorization": `Bearer ${localStorage.getItem("token")}` }
+            });
+            if (logsRes.ok) {
+                const logsData = await logsRes.json();
+                const logLines = (logsData.logs || "").split("\n");
+                const currentErrWarnCount = logLines.filter(line => 
+                    line.includes("ERROR") || 
+                    line.includes("WARNING") || 
+                    line.includes("hata") || 
+                    line.includes("Hata")
+                ).length;
+                
+                if (lastErrorWarningCount !== null && currentErrWarnCount > lastErrorWarningCount) {
+                    const badge = document.getElementById("badge-logs");
+                    if (badge && activePanel !== "panel-logs") {
+                        badge.classList.remove("d-none");
+                    }
+                } else if (activePanel === "panel-logs") {
+                    lastErrorWarningCount = currentErrWarnCount;
+                }
+            }
+        } catch (err) {
+            console.error("Dashboard notification check error:", err);
+        }
+    }
+
     // =========================================================
     // INITIALIZATION & UTIL
     // =========================================================
@@ -1312,6 +1382,10 @@ document.addEventListener("DOMContentLoaded", () => {
         populateSourcesFilter();
         await loadConfigFromServer();
         handleRouting();
+        
+        // Start background checks
+        checkStatusUpdates();
+        setInterval(checkStatusUpdates, 20000);
     }
 
     function debounce(func, wait) {
