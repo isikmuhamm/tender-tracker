@@ -120,7 +120,7 @@ Implementation rules:
 - Preserve backward compatibility for existing portable installations when practical.
 - If a migration is required, add an explicit migration or compatibility path; `create_all()` is not a migration strategy.
 - Do not perform destructive git operations or force-push unless explicitly requested.
-- Do not push commits without user approval.
+- Always treat git push as a sensitive/elevated operation; request explicit approval (elevation) from the user before executing any push command and never push autonomously.
 
 ## Test And Verification Standards
 
