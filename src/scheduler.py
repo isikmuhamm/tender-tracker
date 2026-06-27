@@ -183,20 +183,12 @@ class TenderBotOrchestrator:
             logger.info("Tarama döngüsü tamamlandı.")
 
         # Durumu belirle
-        has_any_errors = (failed_sources > 0 or processing_errors > 0 or notification_errors > 0)
-        
-        if records_added == 0 and (failed_sources > 0 or processing_errors > 0):
+        if successful_sources == 0 and failed_sources > 0:
             status_str = "failed"
-        elif successful_sources > 0:
-            if has_any_errors:
-                status_str = "partial"
-            else:
-                status_str = "success"
-        elif successful_sources == 0:
-            if failed_sources > 0 or processing_errors > 0:
-                status_str = "failed"
-            else:
-                status_str = "success"
+        elif failed_sources > 0 or processing_errors > 0 or notification_errors > 0:
+            status_str = "partial"
+        else:
+            status_str = "success"
             
         return {
             "successful_sources": successful_sources,

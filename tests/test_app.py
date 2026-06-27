@@ -347,3 +347,31 @@ def test_frontend_xss_via_node():
     result = subprocess.run(["node", js_test_path], capture_output=True, text=True)
     assert result.returncode == 0, f"Frontend XSS JS tests failed: {result.stderr}\nOutput: {result.stdout}"
 
+def test_process_lock_owner_token(tmp_path):
+    from src.process_lock import ProcessLock
+    import os
+    
+    def mock_get_data_path(filename):
+        return str(tmp_path / filename)
+        
+    with patch("src.process_lock.get_data_path", side_effect=mock_get_data_path):
+        lock1 = ProcessLock("test_owner")
+        lock2 = ProcessLock("test_owner")
+        
+        assert lock1.acquire() is True
+        
+        # lock2 has a different owner token, trying to release should do nothing!
+        lock2.release()
+        
+        # Verify that lock1 is STILL active and lock2 cannot acquire it
+        assert os.path.exists(lock1.lock_path) is True
+        assert lock2.acquire() is False
+        
+        # Now release with lock1 (which owns it)
+        lock1.release()
+        
+        # Verify that it is released and lock2 can now acquire it
+        assert os.path.exists(lock1.lock_path) is False
+        assert lock2.acquire() is True
+        lock2.release()
+
