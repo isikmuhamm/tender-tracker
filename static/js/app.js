@@ -49,6 +49,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const filterCustom = document.getElementById("filter-custom");
     const filterSource = document.getElementById("filter-source");
     const searchInput = document.getElementById("search-input");
+    const loadMoreBtn = document.getElementById("load-more-btn");
+    let currentTenderOffset = 0;
+    let loadedTendersList = [];
     
     // Actions elements
     const btnTrigger = document.getElementById("btn-trigger");
@@ -473,13 +476,22 @@ document.addEventListener("DOMContentLoaded", () => {
     // =========================================================
     // PANEL: TENDERS
     // =========================================================
-    async function loadTenders() {
+    async function loadTenders(append = false) {
+        if (append !== true) {
+            append = false;
+        }
+        
+        if (!append) {
+            currentTenderOffset = 0;
+            loadedTendersList = [];
+        }
+        
         const sector = filterSector.value;
         const source = filterSource.value;
         const search = searchInput.value.trim();
         const customFilterVal = filterCustom.value;
         
-        let url = `/api/tenders?limit=100`;
+        let url = `/api/tenders?limit=100&offset=${currentTenderOffset}`;
         if (sector) url += `&sector=${encodeURIComponent(sector)}`;
         if (source) url += `&source=${encodeURIComponent(source)}`;
         if (search) url += `&search=${encodeURIComponent(search)}`;
@@ -489,18 +501,32 @@ document.addEventListener("DOMContentLoaded", () => {
         
         const data = await response.json();
         lastTenderCount = data.total;
-        let items = data.items;
+        
+        if (!append) {
+            loadedTendersList = data.items;
+            tendersGrid.innerHTML = "";
+        } else {
+            loadedTendersList = [...loadedTendersList, ...data.items];
+        }
         
         // Client-side Custom LLM Filter
+        let itemsToRender = loadedTendersList;
         if (customFilterVal) {
-            items = items.filter(t => 
+            itemsToRender = loadedTendersList.filter(t => 
                 t.matched_custom_filters && 
                 t.matched_custom_filters.split(",").includes(customFilterVal)
             );
         }
         
-        tenderCount.textContent = items.length;
-        renderTenders(items);
+        tenderCount.textContent = itemsToRender.length;
+        renderTenders(itemsToRender);
+        
+        // Toggle Load More button visibility
+        if (data.total > loadedTendersList.length) {
+            loadMoreBtn.classList.remove("d-none");
+        } else {
+            loadMoreBtn.classList.add("d-none");
+        }
     }
 
     function renderTenders(items) {
@@ -565,6 +591,10 @@ document.addEventListener("DOMContentLoaded", () => {
     filterCustom.addEventListener("change", loadTenders);
     filterSource.addEventListener("change", loadTenders);
     searchInput.addEventListener("input", debounce(loadTenders, 300));
+    loadMoreBtn.addEventListener("click", () => {
+        currentTenderOffset += 100;
+        loadTenders(true);
+    });
 
     // =========================================================
     // PANEL: CONFIGURATION
@@ -1288,6 +1318,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 configAlert.textContent = "Ayarlar başarıyla kaydedildi. Değişikliklerin sunucuda aktifleşmesi için sunucu yeniden başlatılmalı veya tarama beklenmeli.";
                 configAlert.className = "alert-msg success";
                 configAlert.classList.remove("d-none");
+                // Auto-dismiss success alert after 7 seconds
+                setTimeout(() => {
+                    configAlert.classList.add("d-none");
+                }, 7000);
             }
             showToast("Ayarlar sunucuya kaydedildi.");
             
