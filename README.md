@@ -9,8 +9,25 @@
 ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
 **Local-first tender ingestion, deterministic sector classification, optional LLM filtering, and multi-channel notification.**
+---
 
-[Overview](#overview) • [Technical Assessment](#technical-assessment) • [Pipeline](#processing-pipeline) • [Architecture](#system-architecture) • [Installation](#installation) • [User Guide](#kullanım-kılavuzu-ve-ekranlar) • [Troubleshooting](#sorun-giderme) • [Limitations](#current-limitations)
+## 📑 Table of Contents
+1. [Development Status](#development-status)
+2. [Overview](#overview)
+3. [Technical Assessment](#technical-assessment)
+4. [Key Features](#key-features)
+5. [Processing Pipeline](#processing-pipeline)
+6. [Supported Sources](#supported-sources)
+7. [System Architecture](#system-architecture)
+8. [Installation](#installation)
+9. [Configuration](#configuration)
+10. [Kullanım Kılavuzu ve Ekranlar](#kullanım-kılavuzu-ve-ekranlar)
+11. [Sorun Giderme (Troubleshooting)](#windows-smartscreen-veya-defender-uyarısı)
+12. [Testing And Build](#testing-and-build)
+13. [Current Limitations](#current-limitations)
+14. [Project Documentation](#project-documentation)
+15. [Contributing](#contributing)
+16. [License](#license)
 
 ---
 
