@@ -3,8 +3,15 @@ import sys
 import shutil
 import PyInstaller.__main__
 
+# Ensure stdout encodes UTF-8 characters correctly on runners
+if hasattr(sys.stdout, 'reconfigure'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
+
 def build():
-    print("İhale Takip Botu - Tekil Çalıştırılabilir (.exe) Derleme İşlemi")
+    print("Ihale Takip Botu - Tekil Calistirilabilir (.exe) Derleme Islemi")
     print("=" * 60)
     
     # Mevcut build ve dist klasörlerini temizle
@@ -12,9 +19,9 @@ def build():
         if os.path.exists(folder):
             try:
                 shutil.rmtree(folder)
-                print(f"Eski '{folder}' klasörü temizlendi.")
+                print(f"Eski '{folder}' klasoru temizlendi.")
             except Exception as e:
-                print(f"'{folder}' klasörü temizlenirken hata: {e}")
+                print(f"'{folder}' klasoru temizlenirken hata: {e}")
                 
     # İşletim sistemine uygun yol ayracını belirle (Windows için ;, Unix için :)
     sep = ";" if sys.platform.startswith("win") else ":"
@@ -43,17 +50,17 @@ def build():
         "--hidden-import=PIL",
     ]
     
-    print(f"PyInstaller şu parametrelerle çalıştırılıyor: {' '.join(args)}")
+    print(f"PyInstaller su parametrelerle calistiriliyor: {' '.join(args)}")
     print("=" * 60)
     
     try:
         PyInstaller.__main__.run(args)
         print("=" * 60)
-        print("Derleme işlemi BAŞARIYLA tamamlandı!")
-        print("Çalıştırılabilir dosya: dist/tender-tracker.exe (veya ilgili OS uzantısı)")
+        print("Derleme islemi BASARIYLA tamamlandi!")
+        print("Calistirilabilir dosya: dist/tender-tracker.exe (veya ilgili OS uzantisi)")
     except Exception as e:
         print("=" * 60)
-        print(f"Derleme sırasında HATA oluştu: {e}")
+        print(f"Derleme sirasinda HATA olustu: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":
