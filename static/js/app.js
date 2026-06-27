@@ -412,7 +412,6 @@ document.addEventListener("DOMContentLoaded", () => {
             const badge = document.getElementById("badge-tenders");
             if (badge) {
                 badge.classList.add("d-none");
-                badge.textContent = "0";
             }
             loadTenders();
         } else if (targetPanelId === "panel-config") {
@@ -1339,7 +1338,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (lastTenderCount !== null && currentTotal > lastTenderCount) {
                     const badge = document.getElementById("badge-tenders");
                     if (badge && activePanel !== "panel-tenders") {
-                        badge.textContent = currentTotal - lastTenderCount;
                         badge.classList.remove("d-none");
                     }
                 } else if (activePanel === "panel-tenders") {

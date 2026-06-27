@@ -73,7 +73,7 @@
             <nav>
                 <a href="/tenders" class="nav-item active" data-target="panel-tenders" style="position: relative;">
                     <i class="fa-solid fa-file-invoice-dollar"></i> İhaleler
-                    <span id="badge-tenders" class="badge d-none" style="position: absolute; right: 15px; top: 12px; background: var(--primary-color); color: #000; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 10px; box-shadow: 0 0 8px var(--primary-color);">0</span>
+                    <span id="badge-tenders" class="badge-dot d-none" style="position: absolute; right: 15px; top: 18px; width: 8px; height: 8px; background: #ef4444; border-radius: 50%; box-shadow: 0 0 8px #ef4444;" title="Yeni İhale Mevcut!"></span>
                 </a>
                 <a href="/config/general" class="nav-item" data-target="panel-config">
                     <i class="fa-solid fa-sliders"></i> Yapılandırma
@@ -390,7 +390,11 @@
                                 <label for="sec-confirm-pass">Yeni Şifre Tekrar</label>
                                 <input type="password" id="sec-confirm-pass" autocomplete="new-password">
                             </div>
-                            <button type="button" id="btn-change-password" class="btn-secondary">Şifreyi Değiştir</button>
+                            <div class="tab-actions">
+                                <button type="button" id="btn-change-password" class="btn-primary">
+                                    <i class="fa-solid fa-floppy-disk"></i> Şifreyi Güncelle
+                                </button>
+                            </div>
                         </div>
                     </form>
                 </div>
