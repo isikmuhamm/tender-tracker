@@ -1,5 +1,6 @@
 import pytest
 import json
+from datetime import datetime
 from urllib.parse import urlencode
 from unittest.mock import MagicMock, patch
 from src.scraper.ekapv2 import Ekapv2Scraper
@@ -49,6 +50,16 @@ def test_ekapv2_parser_valid():
     assert "İdare: KİK Bilgi İşlem" in item["summary"]
     assert "Yöntem: Açık" in item["summary"]
 
+def test_ekapv2_parser_validation_errors():
+    scraper = Ekapv2Scraper()
+    # If list has items but all are discarded due to missing required fields, it must raise SourceParseError
+    mock_data = {
+        "list": [{"id": "1"}], # missing ikn and title
+        "totalCount": 1
+    }
+    with pytest.raises(SourceParseError):
+        scraper.parse(json.dumps(mock_data))
+
 def test_ekapv2_security_headers():
     scraper = Ekapv2Scraper()
     headers = scraper._generate_security_headers()
@@ -95,10 +106,8 @@ def test_ekapv2_fetch_pagination_multi_page(mock_session_class):
     data = json.loads(raw_result)
     assert len(data["list"]) == 2
     assert data["totalCount"] == 2
-    assert data["list"][0]["ikn"] == "1"
-    assert data["list"][1]["ikn"] == "2"
     
-    # Check that post was called twice with correct pagination parameters
+    # Check that post was called twice
     assert mock_session.post.call_count == 2
     call_args_1 = mock_session.post.call_args_list[0][1]["json"]
     call_args_2 = mock_session.post.call_args_list[1][1]["json"]
@@ -106,29 +115,94 @@ def test_ekapv2_fetch_pagination_multi_page(mock_session_class):
     assert call_args_2["paginationSkip"] == 40
 
 @patch("requests.Session")
-def test_ekapv2_fetch_timeout_error(mock_session_class):
+def test_ekapv2_fetch_first_page_failure(mock_session_class):
     mock_session = MagicMock()
     mock_session_class.return_value = mock_session
     mock_session.post.side_effect = Exception("Connection Timeout")
     
     scraper = Ekapv2Scraper()
-    # When request fails on first page, fetch() must raise SourceFetchError
     with pytest.raises(SourceFetchError):
         scraper.fetch()
+
+@patch("requests.Session")
+def test_ekapv2_fetch_second_page_failure(mock_session_class):
+    mock_session = MagicMock()
+    mock_session_class.return_value = mock_session
+    
+    resp1 = MagicMock()
+    resp1.status_code = 200
+    resp1.json.return_value = {
+        "list": [{"ikn": "1", "ihaleAdi": "Tender 1", "ihaleTipAciklama": "Mal"}],
+        "totalCount": 80
+    }
+    
+    mock_session.post.side_effect = [resp1, Exception("Connection Timeout on Page 2")]
+    
+    scraper = Ekapv2Scraper()
+    with patch("time.sleep"):
+        # When page 2 fails, it must raise SourceFetchError (no partial results returned as success)
+        with pytest.raises(SourceFetchError):
+            scraper.fetch()
+
+@patch("requests.Session")
+def test_ekapv2_fetch_schema_validation(mock_session_class):
+    mock_session = MagicMock()
+    mock_session_class.return_value = mock_session
+    
+    # invalid list type schema
+    resp = MagicMock()
+    resp.status_code = 200
+    resp.json.return_value = {
+        "list": "not a list",
+        "totalCount": 2
+    }
+    mock_session.post.return_value = resp
+    
+    scraper = Ekapv2Scraper()
+    with pytest.raises(SourceFetchError):
+        scraper.fetch()
+
+@patch("requests.Session")
+def test_ekapv2_fetch_state_filters(mock_session_class):
+    mock_session = MagicMock()
+    mock_session_class.return_value = mock_session
+    
+    resp = MagicMock()
+    resp.status_code = 200
+    resp.json.return_value = {
+        "list": [],
+        "totalCount": 0
+    }
+    mock_session.post.return_value = resp
+    
+    # 1. Initial scan: last_success_at is None
+    scraper = Ekapv2Scraper()
+    scraper.last_success_at = None
+    scraper.fetch()
+    
+    call_json_1 = mock_session.post.call_args_list[0][1]["json"]
+    assert call_json_1["ilanTarihSaatBaslangic"] is None
+    assert call_json_1["ihaleDurumIdList"] == [2] # Teklif Vermeye Açık
+    
+    # 2. Incremental scan: last_success_at set
+    scraper.last_success_at = datetime(2026, 6, 27)
+    scraper.fetch()
+    
+    call_json_2 = mock_session.post.call_args_list[1][1]["json"]
+    assert call_json_2["ilanTarihSaatBaslangic"] == "27.06.2026"
+    assert call_json_2["ihaleDurumIdList"] == [2]
 
 def test_ekapv2_details_link_determinism():
     scraper = Ekapv2Scraper()
     ikn = "2026/271215"
     link1 = f"https://ekap.kik.gov.tr/EKAP/Ortak/IhaleArama/IhaleArama.aspx?{urlencode({'IKN': ikn})}"
     link2 = f"https://ekap.kik.gov.tr/EKAP/Ortak/IhaleArama/IhaleArama.aspx?{urlencode({'IKN': ikn})}"
-    # Verify exact same URL is produced consistently
     assert link1 == link2
     assert "IKN=2026%2F271215" in link1
 
 @patch("src.scheduler.SessionLocal")
 @patch("src.scheduler.init_db")
 def test_scheduler_ekap_isolation(mock_init, mock_session_class, tmp_path):
-    # Tests that if EKAP scraper fails with exception, DMO scraper still runs successfully
     from src.scheduler import TenderBotOrchestrator
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker

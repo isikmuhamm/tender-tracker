@@ -58,6 +58,13 @@ class Tender(Base):
     def __repr__(self):
         return f"<Tender(title='{self.title[:30]}...', source='{self.source}', sector='{self.sector}')>"
 
+class SystemState(Base):
+    __tablename__ = 'system_states'
+
+    key = Column(String, primary_key=True)
+    value = Column(String, nullable=True)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
 # Engine ve Session tanımları
 engine = create_engine(DATABASE_URL, echo=False)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

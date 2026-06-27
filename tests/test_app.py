@@ -375,3 +375,44 @@ def test_process_lock_owner_token(tmp_path):
         assert lock2.acquire() is True
         lock2.release()
 
+def test_run_startup_scan_triggered():
+    import sys
+    with patch("app.TenderBotOrchestrator") as mock_orch_class, patch("src.process_lock.ProcessLock") as mock_lock_class:
+        # Mock ProcessLock to successfully acquire lock
+        mock_lock = MagicMock()
+        mock_lock.acquire.return_value = True
+        mock_lock_class.return_value = mock_lock
+        
+        mock_orch = MagicMock()
+        mock_orch_class.return_value = mock_orch
+        
+        # Remove pytest from sys.modules dictionary temporarily
+        original_pytest = sys.modules.pop("pytest", None)
+        
+        try:
+            import threading
+            original_thread = threading.Thread
+            threads = []
+            def mock_thread(*args, **kwargs):
+                t = original_thread(*args, **kwargs)
+                threads.append(t)
+                return t
+            with patch("threading.Thread", side_effect=mock_thread):
+                from app import run_startup_scan, job_state
+                # Ensure job_state is idle
+                job_state.status = "idle"
+                run_startup_scan()
+                
+                # Wait for thread to finish
+                for t in threads:
+                    t.join(timeout=3)
+        finally:
+            if original_pytest:
+                sys.modules["pytest"] = original_pytest
+                    
+        assert mock_orch.run_once.call_count == 1
+        assert mock_lock.acquire.call_count == 1
+        assert mock_lock.release.call_count == 1
+
+
+

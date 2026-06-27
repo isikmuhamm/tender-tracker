@@ -38,6 +38,7 @@ class Ekapv2Scraper(BaseScraper):
     def __init__(self):
         super().__init__(source_name="ekapv2")
         self.url = "https://ekapv2.kik.gov.tr/b_ihalearama/api/Ihale/GetListByParameters"
+        self.last_success_at = None
         self.headers = {
             'Accept': 'application/json',
             'Accept-Language': 'tr',
@@ -90,11 +91,18 @@ class Ekapv2Scraper(BaseScraper):
                 except Exception:
                     pass
 
+        # Tarih filtresi belirle (last_success_at var ise o tarihten sonrakiler, yoksa teklif vermeye açık tüm ihaleler)
+        date_start = None
+        if self.last_success_at:
+            date_start = self.last_success_at.strftime("%d.%m.%Y")
+            logger.info(f"EKAPv2 incremental sync aktif: {date_start} tarihinden sonra yayımlanan ihaleler aranıyor.")
+        else:
+            logger.info("EKAPv2 ilk tarama aktif: Teklif vermeye açık ihaleler aranıyor.")
+
         all_tenders = []
-        total_count = 0
-        skip = 0
+        page = 0
         take = 40
-        max_records = 200
+        max_pages = 500
         
         # 2. TLS Adapter kurulumunu gerçekleştir (varsayılan olarak sertifika doğrulaması açıktır)
         def make_session(verify_secure=True):
@@ -107,7 +115,8 @@ class Ekapv2Scraper(BaseScraper):
         session = make_session(verify_secure=True)
         is_fallback_active = False
 
-        while skip < max_records:
+        while page < max_pages:
+            skip = page * take
             try:
                 session.headers.update(self._generate_security_headers())
             except Exception as e:
@@ -132,14 +141,14 @@ class Ekapv2Scraper(BaseScraper):
                 "iknSayi": None,
                 "ihaleTarihSaatBaslangic": None,
                 "ihaleTarihSaatBitis": None,
-                "ilanTarihSaatBaslangic": None,
+                "ilanTarihSaatBaslangic": date_start,
                 "ilanTarihSaatBitis": None,
                 "yasaKapsami4734List": [],
                 "ihaleTuruIdList": [],
                 "ihaleUsulIdList": [],
                 "ihaleUsulAltIdList": [],
                 "ihaleIlIdList": [],
-                "ihaleDurumIdList": [],
+                "ihaleDurumIdList": [2],  # Teklif Vermeye Açık
                 "idareIdList": [],
                 "ihaleIlanTuruIdList": [],
                 "teklifTuruIdList": [],
@@ -183,7 +192,6 @@ class Ekapv2Scraper(BaseScraper):
                     logger.warning("EKAPv2 standard SSL verification failed. Falling back to insecure compatibility mode as configured.")
                     is_fallback_active = True
                     session = make_session(verify_secure=False)
-                    # Warnings modülüyle insecure request uyarılarını sessize al
                     with warnings.catch_warnings():
                         warnings.simplefilter("ignore", urllib3.exceptions.InsecureRequestWarning)
                         try:
@@ -192,25 +200,26 @@ class Ekapv2Scraper(BaseScraper):
                             r.raise_for_status()
                             data = r.json()
                         except Exception as retry_err:
-                            if skip == 0:
-                                raise SourceFetchError(f"EKAPv2 API bağlantı hatası (Fallback): {retry_err}")
-                            else:
-                                break
+                            raise SourceFetchError(f"EKAPv2 API bağlantı hatası (Fallback, Sayfa {page}): {retry_err}")
                 else:
-                    if skip == 0:
-                        raise SourceFetchError(f"EKAPv2 SSL verification failed: {ssl_err}. Fallback is disabled.")
-                    else:
-                        break
+                    raise SourceFetchError(f"EKAPv2 SSL verification failed (Sayfa {page}): {ssl_err}. Fallback is disabled.")
             except Exception as e:
-                # Diğer HTTP/bağlantı hataları
-                if skip == 0:
-                    raise SourceFetchError(f"EKAPv2 API bağlantı hatası: {e}")
-                else:
-                    logger.warning(f"EKAPv2 API sonraki sayfayı çekerken hata aldı: {e}")
-                    break
-                    
-            tenders = data.get("list", [])
-            total_count = data.get("totalCount", 0)
+                # Diğer HTTP/bağlantı hatalarında (sayfa fark etmeksizin) hatayı fırlat
+                raise SourceFetchError(f"EKAPv2 API bağlantı hatası (Sayfa {page}): {e}")
+            
+            # 4. Şema Doğrulaması (Schema Validation)
+            if not isinstance(data, dict):
+                raise SourceFetchError(f"EKAPv2 API yanıtı sözlük nesnesi değil (Sayfa {page})")
+            if "list" not in data or not isinstance(data["list"], list):
+                raise SourceFetchError(f"EKAPv2 API yanıtında 'list' alanı bulunamadı veya geçersiz (Sayfa {page})")
+            if "totalCount" not in data or not isinstance(data["totalCount"], (int, float)) or data["totalCount"] < 0:
+                raise SourceFetchError(f"EKAPv2 API yanıtında 'totalCount' alanı eksik veya negatif (Sayfa {page})")
+                
+            tenders = data["list"]
+            total_count = int(data["totalCount"])
+            
+            if total_count > 0 and not tenders and page == 0:
+                raise SourceFetchError("EKAPv2 API ilk sayfada kayıt dönmedi, totalCount sıfırdan büyük olmasına rağmen.")
             
             if not tenders:
                 break
@@ -220,7 +229,7 @@ class Ekapv2Scraper(BaseScraper):
             if len(all_tenders) >= total_count:
                 break
                 
-            skip += take
+            page += 1
             # Sunucuyu yormamak için kısa bekleme süresi
             time.sleep(0.5)
             
@@ -236,6 +245,10 @@ class Ekapv2Scraper(BaseScraper):
         try:
             data = json.loads(raw_data)
             tenders = data.get("list", [])
+            total_count = data.get("totalCount", 0)
+            
+            if not tenders and total_count == 0:
+                return []
             
             items = []
             for tender in tenders:
@@ -244,6 +257,9 @@ class Ekapv2Scraper(BaseScraper):
                     continue
                 
                 title = tender.get("ihaleAdi", "")
+                if not title:
+                    continue
+                    
                 link = f"https://ekap.kik.gov.tr/EKAP/Ortak/IhaleArama/IhaleArama.aspx?{urlencode({'IKN': ikn})}"
                 category = tender.get("ihaleTipAciklama", "Diğer")
                 
@@ -277,7 +293,12 @@ class Ekapv2Scraper(BaseScraper):
                     "source": self.source_name
                 })
                 
+            if tenders and not items:
+                raise SourceParseError("Gelen tüm EKAP kayıtları eksik zorunlu alanlar (ikn/title) yüzünden elendi.")
+                
             logger.info(f"EKAPv2 İhaleleri ayrıştırıldı. Toplam {len(items)} ihale bulundu.")
             return items
         except Exception as e:
+            if isinstance(e, SourceParseError):
+                raise e
             raise SourceParseError(f"EKAPv2 ayrıştırma hatası: {e}")

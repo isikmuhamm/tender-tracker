@@ -125,3 +125,46 @@ def test_status_scenarios(mock_init, mock_session_class, mock_db_setup, tmp_path
     assert result5["successful_sources"] == 1
     assert result5["processing_errors"] == 1
     assert result5["records_added"] == 0
+
+    # 6. Scenario: EKAP metadata state handling (initial vs incremental sync updates)
+    from src.database import SystemState
+    # Clean system state first
+    session.query(SystemState).filter_by(key="last_success_at_ekapv2").delete()
+    session.commit()
+
+    scraper_ekap = MagicMock()
+    scraper_ekap.source_name = "ekapv2"
+    scraper_ekap.get_new_items.return_value = []
+
+    orch6 = TenderBotOrchestrator(config_path=str(config_file))
+    orch6.scrapers = [scraper_ekap]
+    orch6.notifiers = []
+
+    # Verify initial run sets scraper.last_success_at to None
+    result6 = orch6.run_once()
+    assert scraper_ekap.last_success_at is None
+    
+    # Check that database now has the state updated
+    session.expire_all()
+    state_after = session.query(SystemState).filter_by(key="last_success_at_ekapv2").first()
+    assert state_after is not None
+    last_success_val = state_after.value
+    assert last_success_val is not None
+
+    # Run again: should resolve it from database and set it on the scraper instance
+    result7 = orch6.run_once()
+    assert scraper_ekap.last_success_at is not None
+    assert scraper_ekap.last_success_at.isoformat() == last_success_val
+
+    # Capture the updated value after result7 succeeds
+    session.expire_all()
+    updated_success_val = session.query(SystemState).filter_by(key="last_success_at_ekapv2").first().value
+
+    # Fail run: should not advance/change the success date
+    scraper_ekap.get_new_items.side_effect = Exception("Fetch failed on page 2")
+    orch6.run_once()
+    
+    # Value must remain unchanged
+    session.expire_all()
+    state_after_fail = session.query(SystemState).filter_by(key="last_success_at_ekapv2").first()
+    assert state_after_fail.value == updated_success_val

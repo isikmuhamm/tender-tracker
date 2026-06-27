@@ -56,8 +56,8 @@ class EmailNotifier(BaseNotifier):
             return True
 
         if not self.smtp_host or not self.mail_from or not self.mail_to:
-            logger.error("SMTP veya Alıcı ayarları eksik. E-posta bildirimi gönderilemiyor.")
-            return False
+            logger.warning("SMTP veya Alıcı ayarları eksik. E-posta bildirimi pas geçiliyor.")
+            return True
 
         logger.info(f"E-posta hazırlanıyor. Toplam ihale sayısı: {len(tenders)}")
         

@@ -377,3 +377,21 @@ Process-level lock implementation added; cross-process operational verification 
 
 ### Architectural Result
 The EKAP v2 public tender search is fully integrated as an operational, secure, and mock-tested scraper adapter.
+
+---
+
+## H-015 EKAP Initial and Incremental Synchronization
+
+**Date:** 2026-06-27
+
+### Delivered
+- Automatic background scan on FastAPI startup.
+- `SystemState` key-value persistence table for runtime metadata.
+- State-aware initial scan (fetching only open tenders) and incremental scan (filtering by announcement start date).
+- Safe multi-page pagination up to 500 pages (no 200 records cap) with transactional error escalation.
+- Unconfigured email/Telegram notifiers warning-skip behavior to prevent backlog build-ups.
+- JSON response schema verification on EKAP v2 results.
+- Comprehensive test scenarios in `tests/test_ekapv2.py` and `tests/test_scheduler_status.py`.
+
+### Architectural Result
+Incremental and initial synchronization behavior for EKAP is robustly tied to local state persistence, ensuring stable execution paths over restarts and failures.

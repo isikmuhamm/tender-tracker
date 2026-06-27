@@ -2,7 +2,7 @@ import os
 import logging
 import yaml
 from sqlalchemy.orm import Session
-from src.database import init_db, SessionLocal, Tender
+from src.database import init_db, SessionLocal, Tender, SystemState
 from src.filter import TenderFilter
 from src.classifier import TenderClassifier
 from src.scraper.yatirimlar import YatirimlarScraper
@@ -88,8 +88,32 @@ class TenderBotOrchestrator:
             for scraper in self.scrapers:
                 try:
                     logger.info(f"Kaynak taranıyor: {scraper.source_name}")
+                    
+                    if scraper.source_name == "ekapv2":
+                        from datetime import datetime
+                        state_val = db.query(SystemState).filter_by(key="last_success_at_ekapv2").first()
+                        if state_val and state_val.value:
+                            try:
+                                scraper.last_success_at = datetime.fromisoformat(state_val.value)
+                            except Exception:
+                                scraper.last_success_at = None
+                        else:
+                            scraper.last_success_at = None
+                            
                     scraped_items = scraper.get_new_items()
                     successful_sources += 1
+                    
+                    if scraper.source_name == "ekapv2":
+                        from datetime import datetime, timezone
+                        now_iso = datetime.now(timezone.utc).isoformat()
+                        state_val = db.query(SystemState).filter_by(key="last_success_at_ekapv2").first()
+                        if not state_val:
+                            state_val = SystemState(key="last_success_at_ekapv2", value=now_iso)
+                            db.add(state_val)
+                        else:
+                            state_val.value = now_iso
+                            state_val.updated_at = datetime.now(timezone.utc)
+                        db.commit()
                     
                     for item in scraped_items:
                         # Veritabanında mükerrerlik kontrolü

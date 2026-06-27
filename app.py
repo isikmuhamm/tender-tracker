@@ -67,6 +67,43 @@ if not any(isinstance(h, logging.StreamHandler) and not isinstance(h, logging.Fi
 
 app = FastAPI(title="Tender Tracker API", version="1.0.0")
 
+def run_startup_scan():
+    """Uygulama başladığında otomatik taramayı arka planda başlatır."""
+    if "pytest" in sys.modules:
+        logger.info("Otomatik başlangıç taraması atlandı: Test ortamındayız.")
+        return
+        
+    from src.process_lock import ProcessLock
+    
+    if not job_state.start_job("scanning"):
+        logger.info("Otomatik başlangıç taraması atlandı: Sistem zaten meşgul.")
+        return
+        
+    lock = ProcessLock("scan")
+    if not lock.acquire():
+        job_state.finish_job(False, "Başka bir tarama işlemi (CLI daemon veya eşzamanlı istek) çalışıyor.")
+        logger.info("Otomatik başlangıç taraması atlandı: ProcessLock alınamadı.")
+        return
+        
+    def run_scraper_bg():
+        try:
+            logger.info("Otomatik başlangıç taraması başlatılıyor...")
+            orch = TenderBotOrchestrator()
+            result = orch.run_once()
+            job_state.finish_job(True, result=result)
+            logger.info("Otomatik başlangıç taraması başarıyla tamamlandı.")
+        except Exception as e:
+            logger.error(f"Otomatik başlangıç tarama hatası: {e}", exc_info=True)
+            job_state.finish_job(False, str(e))
+        finally:
+            lock.release()
+            
+    threading.Thread(target=run_scraper_bg, daemon=True).start()
+
+@app.on_event("startup")
+def startup_event():
+    run_startup_scan()
+
 def get_resource_path(relative_path):
     """PyInstaller geçici klasöründeki veya çalışma dizinindeki dosya yolunu çözümler."""
     try:
