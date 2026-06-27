@@ -267,28 +267,29 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // =========================================================
-    // SIDEBAR & TABS NAVIGATION (Hash Routing)
+    // =========================================================
+    // SIDEBAR & TABS NAVIGATION (HTML5 History API Routing)
     // =========================================================
     function handleRouting() {
-        const hash = window.location.hash || "#/tenders";
+        const path = window.location.pathname || "/tenders";
         
         let targetPanelId = "panel-tenders";
         let targetNavItem = document.querySelector('.nav-item[data-target="panel-tenders"]');
         let activeConfigTab = "tab-general";
         
-        if (hash.startsWith("#/config")) {
+        if (path.startsWith("/config")) {
             targetPanelId = "panel-config";
             targetNavItem = document.querySelector('.nav-item[data-target="panel-config"]');
             
-            const parts = hash.split("/");
-            if (parts.length > 2) {
-                const sub = parts[2];
+            const parts = path.split("/").filter(Boolean);
+            if (parts.length > 1) {
+                const sub = parts[1];
                 if (sub === "filters") activeConfigTab = "tab-filters";
                 else if (sub === "notifications") activeConfigTab = "tab-notifications";
                 else if (sub === "sectors") activeConfigTab = "tab-sectors";
                 else if (sub === "security") activeConfigTab = "tab-security";
             }
-        } else if (hash === "#/logs") {
+        } else if (path === "/logs") {
             targetPanelId = "panel-logs";
             targetNavItem = document.querySelector('.nav-item[data-target="panel-logs"]');
         }
@@ -337,7 +338,20 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
     
-    window.addEventListener("hashchange", handleRouting);
+    // Intercept internal link clicks and route using pushState
+    document.addEventListener("click", e => {
+        const link = e.target.closest("a");
+        if (link) {
+            const href = link.getAttribute("href");
+            if (href && href.startsWith("/") && !href.startsWith("/static") && !href.startsWith("/api")) {
+                e.preventDefault();
+                history.pushState(null, "", href);
+                handleRouting();
+            }
+        }
+    });
+
+    window.addEventListener("popstate", handleRouting);
 
     // Toggle active provider config block
     cfgLlmProvider.addEventListener("change", () => {

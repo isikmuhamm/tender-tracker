@@ -351,6 +351,15 @@ def get_logs(current_user: User = Depends(get_current_user)):
     except Exception as e:
         return {"logs": f"Loglar okunurken hata: {e}"}
 
+@app.get("/{catchall:path}")
+def catch_all(catchall: str):
+    if catchall.startswith("api/") or catchall.startswith("static/"):
+        raise HTTPException(status_code=404, detail="Bulunamadı")
+    index_path = os.path.join(static_dir, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    return {"message": "Arayüz dosyaları bulunamadı. Lütfen static/index.html'i yükleyin."}
+
 # Veritabanını uygulama başlarken hazırla
 init_db()
 

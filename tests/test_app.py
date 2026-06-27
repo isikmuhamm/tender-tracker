@@ -190,3 +190,13 @@ def test_get_models_endpoint(client):
     assert "models" in data
     assert "gemini-1.5-flash" in data["models"]
 
+def test_catchall_frontend_routes(client):
+    response = client.get("/tenders")
+    assert response.status_code == 200
+    
+    response2 = client.get("/config/general")
+    assert response2.status_code == 200
+
+    response3 = client.get("/api/nonexistent")
+    assert response3.status_code == 404
+
