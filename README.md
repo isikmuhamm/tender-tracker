@@ -223,34 +223,42 @@ Authenticated pages, e-signature flows, CAPTCHA bypass, private account automati
 
 ## System Architecture
 
-```text
-┌──────────────────────────────────────────────────────────────┐
-│                       PRESENTATION                           │
-│  Local SPA Dashboard · Setup/Login · Logs · Configuration  │
-└──────────────────────────────┬───────────────────────────────┘
-                               │
-┌──────────────────────────────▼───────────────────────────────┐
-│                         API LAYER                            │
-│       FastAPI · Local Authentication · REST Endpoints       │
-└──────────────────────────────┬───────────────────────────────┘
-                               │
-┌──────────────────────────────▼───────────────────────────────┐
-│                    APPLICATION SERVICES                     │
-│ Orchestrator · Rules · Classifier · LLM Client · Notifiers │
-└───────────────┬──────────────────────────────┬───────────────┘
-                │                              │
-┌───────────────▼──────────────┐  ┌────────────▼──────────────┐
-│       SOURCE ADAPTERS        │  │      OUTPUT ADAPTERS      │
-│ Yatırımlar · DMO · İlan      │  │ Dashboard · Email        │
-│ EKAPv2 experimental          │  │ Telegram                 │
-└───────────────┬──────────────┘  └────────────┬──────────────┘
-                │                              │
-                └──────────────┬───────────────┘
-                               │
-┌──────────────────────────────▼───────────────────────────────┐
-│                         DATA LAYER                           │
-│          SQLite · SQLAlchemy · YAML · Local Logs            │
-└──────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph UI["🖥️ Presentation Layer"]
+        Dashboard["Local SPA Dashboard<br/>(Setup / Login / Logs / Configuration)"]
+    end
+
+    subgraph API["🔌 API Layer"]
+        FastAPI["FastAPI App<br/>(Local Auth & REST Endpoints)"]
+    end
+
+    subgraph Core["⚙️ Application Services"]
+        Orchestrator["Scheduler & Orchestrator"]
+        Classifier["Rule & AI Classifier"]
+        LLMClient["LLM Provider Client"]
+    end
+
+    subgraph Adapters["🔌 Adapters"]
+        Sources["Source Adapters<br/>(Yatırımlar, DMO, ilan.gov.tr, EKAPv2)"]
+        Notifiers["Output Adapters<br/>(Dashboard, SMTP Email, Telegram)"]
+    end
+
+    subgraph Data["💾 Data Layer"]
+        DB["SQLite Database (SQLAlchemy ORM)"]
+        YAML["YAML Settings (config.yaml, sectors.yaml)"]
+        Logs["Local Logs (events.log)"]
+    end
+
+    Dashboard -->|HTTP Requests / JSON| FastAPI
+    FastAPI -->|Direct Invocation| Orchestrator
+    Orchestrator -->|Evaluate Rules| Classifier
+    Classifier -->|API Requests| LLMClient
+    Orchestrator -->|Fetch Feeds| Sources
+    Orchestrator -->|Push Alerts| Notifiers
+    Orchestrator & FastAPI & Classifier -->|Read/Write| DB
+    Orchestrator & FastAPI & Classifier -->|Read/Write| YAML
+    Orchestrator & FastAPI & Classifier -->|Append| Logs
 ```
 
 ### Project Structure
