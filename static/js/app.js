@@ -482,6 +482,7 @@ document.addEventListener("DOMContentLoaded", () => {
         let url = `/api/tenders?limit=100`;
         if (sector) url += `&sector=${encodeURIComponent(sector)}`;
         if (source) url += `&source=${encodeURIComponent(source)}`;
+        if (search) url += `&search=${encodeURIComponent(search)}`;
         
         const response = await apiRequest(url);
         if (!response || !response.ok) return;
@@ -495,15 +496,6 @@ document.addEventListener("DOMContentLoaded", () => {
             items = items.filter(t => 
                 t.matched_custom_filters && 
                 t.matched_custom_filters.split(",").includes(customFilterVal)
-            );
-        }
-        
-        // Client-side text search
-        if (search) {
-            const q = search.toLowerCase();
-            items = items.filter(t => 
-                t.title.toLowerCase().includes(q) || 
-                (t.summary && t.summary.toLowerCase().includes(q))
             );
         }
         

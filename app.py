@@ -226,17 +226,28 @@ def change_password(
 def get_tenders(
     sector: str = None,
     source: str = None,
+    search: str = None,
     limit: int = 50,
     offset: int = 0,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """Filtrelenebilir ihale listesini döner."""
+    from sqlalchemy import or_
     query = db.query(Tender)
     if sector:
         query = query.filter_by(sector=sector)
     if source:
         query = query.filter_by(source=source)
+    if search:
+        search_filter = f"%{search}%"
+        query = query.filter(
+            or_(
+                Tender.title.ilike(search_filter),
+                Tender.summary.ilike(search_filter),
+                Tender.category.ilike(search_filter)
+            )
+        )
         
     total = query.count()
     # En son görülen ihale en üstte olacak şekilde sırala

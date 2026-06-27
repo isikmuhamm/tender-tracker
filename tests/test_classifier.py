@@ -52,14 +52,14 @@ def test_local_classification_negative_keywords(temp_sectors_file):
     assert sector is None
     assert method == "none"
 
-def test_local_classification_insufficient_score(temp_sectors_file):
+def test_local_classification_summary_score(temp_sectors_file):
     tc = TenderClassifier(sectors_path=temp_sectors_file)
     tc.ai_enabled = False
     
-    # Sadece özette tek bir kelime geçiyor -> puan 1, eşik değer 2'den küçük olduğu için eşleşmez
+    # Sadece özette tek bir kelime geçiyor -> artık eşleşmeli çünkü başlık/özet farkı yok
     sector, method = tc.classify("Genel İhale İlanı", "Bu projede tren kullanılabilir.")
-    assert sector is None
-    assert method == "none"
+    assert sector == "Demiryolu"
+    assert method == "rule"
 
 def test_evaluate_custom_filters_success(temp_sectors_file):
     from unittest.mock import patch

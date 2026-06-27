@@ -19,7 +19,7 @@ def matches_keyword(kw: str, text: str) -> bool:
 class TenderClassifier:
     """
     İhaleleri sektörel olarak sınıflandıran katman.
-    API anahtarı varsa LLM ile, yoksa kural tabanlı (sectors.yaml) yerel filtreyle çalışır.
+    sectors.yaml dosyasındaki anahtar kelimelere göre yerel sınıflandırma yapar.
     """
     def __init__(self, sectors_path: str = None):
         from src.database import get_data_path
@@ -66,10 +66,8 @@ class TenderClassifier:
             keywords = rules.get("keywords", [])
             score = 0
             for kw in keywords:
-                if matches_keyword(kw, t):
+                if matches_keyword(kw, t) or matches_keyword(kw, s):
                     score += 2
-                elif matches_keyword(kw, s):
-                    score += 1
             
             if score > max_score:
                 max_score = score
@@ -78,43 +76,6 @@ class TenderClassifier:
         if max_score >= 2:
             return best_sector
         return None
-
-    def classify_ai(self, title: str, summary: str = "") -> str:
-        """
-        Aktif LLM sağlayıcısını kullanarak başlık ve özeti analiz edip ihaleyi sınıflandırır.
-        """
-        if not self.ai_enabled:
-            return None
-            
-        sectors_list = [name for name, rules in self.sectors.items() if rules.get("enabled", True)]
-        prompt = f"""
-        Aşağıdaki ihale başlığı ve detayını analiz ederek bu ihaleyi şu sektör listesinden en uygun olanına sınıflandır: {sectors_list}.
-        Eğer ihale bu listedeki hiçbir sektöre uymuyorsa, "sector" değerini null olarak ata.
-        
-        İhale Başlığı: {title}
-        İhale Detayı: {summary}
-        
-        Yanıtı sadece aşağıdaki JSON şemasında ver:
-        {{
-            "sector": "Sektör Adı veya null"
-        }}
-        """
-        try:
-            res_text = self.llm.complete(prompt, json_response=True)
-            if not res_text:
-                return None
-            if res_text.startswith("```"):
-                lines = res_text.splitlines()
-                if len(lines) > 2:
-                    res_text = "\n".join(lines[1:-1])
-            data = json.loads(res_text)
-            sector = data.get("sector")
-            if sector in sectors_list:
-                return sector
-            return None
-        except Exception as e:
-            logger.error(f"LLM sınıflandırma hatası: {e}")
-            return None
 
     def evaluate_custom_filters(self, title: str, summary: str, custom_filters: list, sector: str = None) -> list:
         """
@@ -177,17 +138,10 @@ class TenderClassifier:
         İhaleyi sınıflandırır. 
         Dönen çıktı: (SektörAdı veya None, SınıflandırmaYöntemi)
         """
-        # 1. Öncelikle hızlı yerel kural tabanlı sınıflandırmayı dene (0ms latency)
+        # Sadece hızlı yerel kural tabanlı sınıflandırmayı kullan (0ms latency, token maliyeti yok)
         sector = self.classify_local(title, summary)
         if sector:
             logger.info(f"İhale yerel kurallarla sınıflandırıldı: '{sector}' | '{title[:40]}...'")
             return sector, "rule"
             
-        # 2. Yerel kurallarla eşleşmediyse ve LLM aktifse, LLM ile akıllı sınıflandırma dene
-        if self.ai_enabled:
-            sector = self.classify_ai(title, summary)
-            if sector:
-                logger.info(f"İhale AI ile sınıflandırıldı: '{sector}' | '{title[:40]}...'")
-                return sector, "ai"
-                
         return None, "none"

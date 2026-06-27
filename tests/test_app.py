@@ -84,6 +84,45 @@ def test_tenders_endpoint_authorized(client):
     assert "total" in data
     assert "items" in data
 
+def test_tenders_endpoint_search(client, test_db):
+    login_resp = client.post(
+        "/api/auth/login",
+        data={"username": "admin", "password": "admin"}
+    )
+    token = login_resp.json()["access_token"]
+    
+    from src.database import Tender
+    dummy = Tender(
+        link="https://search-test.com",
+        title="Search Target Title",
+        summary="Search Target Summary Institution Name",
+        category="Yapım",
+        source="ekapv2"
+    )
+    test_db.add(dummy)
+    test_db.commit()
+    
+    try:
+        response = client.get(
+            "/api/tenders?search=Target",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["items"]) >= 1
+        assert any(item["link"] == "https://search-test.com" for item in data["items"])
+        
+        response = client.get(
+            "/api/tenders?search=Institution",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["items"]) >= 1
+    finally:
+        test_db.query(Tender).filter_by(link="https://search-test.com").delete()
+        test_db.commit()
+
 from unittest.mock import patch, mock_open
 
 def test_get_config_authorized(client):
