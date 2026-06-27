@@ -1,5 +1,6 @@
 import argparse
 import sys
+import os
 import time
 import logging
 import urllib3
@@ -87,6 +88,36 @@ def show_stats():
     finally:
         db.close()
 
+def get_check_interval() -> int:
+    """Tarama aralığını config.yaml settings.check_interval, env veya varsayılan 60 dakika olarak belirler."""
+    import yaml
+    interval = None
+    
+    # 1. config.yaml settings.check_interval okumayı dene
+    config_path = get_data_path("config.yaml")
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                config = yaml.safe_load(f) or {}
+                interval = config.get("settings", {}).get("check_interval")
+        except Exception:
+            pass
+            
+    # 2. CHECK_INTERVAL_MINUTES env okumayı dene
+    if interval is None:
+        try:
+            env_val = os.getenv("CHECK_INTERVAL_MINUTES")
+            if env_val:
+                interval = int(env_val)
+        except Exception:
+            pass
+            
+    # 3. Varsayılan değer
+    if interval is None:
+        interval = 60
+        
+    return int(interval)
+
 def main():
     args = parse_arguments()
     
@@ -112,21 +143,22 @@ def main():
         logger.info("İHALE TAKİP BOTU - SÜREKLİ ÇALIŞMA (DAEMON) MODU")
         logger.info("=" * 60)
         
-        # Çalışma aralığını env'den veya config'den çek
-        interval_minutes = int(os.getenv("CHECK_INTERVAL_MINUTES", 60))
+        # Çalışma aralığını alan helper çağrısı
+        interval_minutes = get_check_interval()
         logger.info(f"Bot başlatıldı. Tarama sıklığı: {interval_minutes} dakika.")
         
-        while True:
-            try:
-                orchestrator.run_once()
-            except KeyboardInterrupt:
-                logger.info("Bot kullanıcı tarafından sonlandırıldı.")
-                sys.exit(0)
-            except Exception as e:
-                logger.error(f"Daemon döngüsünde beklenmeyen hata: {e}")
-            
-            logger.info(f"Bekleme moduna geçiliyor. Sonraki tarama {interval_minutes} dakika sonra.")
-            time.sleep(interval_minutes * 60)
+        try:
+            while True:
+                try:
+                    orchestrator.run_once()
+                except Exception as e:
+                    logger.error(f"Daemon döngüsünde beklenmeyen hata: {e}")
+                
+                logger.info(f"Bekleme moduna geçiliyor. Sonraki tarama {interval_minutes} dakika sonra.")
+                time.sleep(interval_minutes * 60)
+        except KeyboardInterrupt:
+            logger.info("Bot kullanıcı tarafından sonlandırıldı.")
+            sys.exit(0)
 
 if __name__ == "__main__":
     main()
