@@ -2,24 +2,8 @@
 
 Bu proje, farklı kaynaklardan (Yatırımlar Dergisi, DMO, ilan.gov.tr, EKAPv2) ihaleleri otomatik olarak toplayan, kural tabanlı yerel filtrelerden ve LLM (Gemini, OpenAI, Claude) tabanlı akıllı süzgeçlerden geçirerek ilgili ihaleleri e-posta ve Telegram üzerinden anlık bildiren modüler bir kurumsal takip sistemidir.
 
----
 
-## 1. `buraktuzlutas/ihaleTakip` Projesi ile Karşılaştırma
-
-Aşağıdaki tablo, projemizin Github üzerindeki tek amaçlı `buraktuzlutas/ihaleTakip` haşere ilaçlama ihale takip botuna kıyasla teknik ve mimari üstünlüklerini özetlemektedir:
-
-| Özellik / Kriter | buraktuzlutas/ihaleTakip | Bizim İhale Takip Botumuz (Tender Tracker) |
-| :--- | :--- | :--- |
-| **Kapsam & Modülerlik** | Sadece "Haşere İlaçlama" sektörüne ve tek kaynağa (EKAP API) sabitlenmiştir. | Çoklu kaynak desteği (Yatırımlar Dergisi, DMO, ilan.gov.tr, EKAPv2) ve sınırsız sayıda özelleştirilebilir sektörel filtre sunar. |
-| **Sınıflandırma Mantığı** | Yalnızca basit yerel kelime araması yapar. | **İki Aşamalı Hibrit Süzgeç:** 1. Aşama yerel kelime/negatif kelime filtresi, 2. Aşama LLM (Yapay Zeka) ile detaylı anlamsal analiz ve akıllı etiketleme. |
-| **Arayüz (UI)** | Grafik arayüzü yoktur. Konsoldan çalışır, ayarlar `.env` dosyası ile el ile düzenlenir. | **Modern Glassmorphic Web Dashboard (SPA):** Şifreli giriş, ilk kurulum sihirbazı, dinamik form tabanlı ayarlar (SMTP, Telegram, LLM), canlı log izleyici. |
-| **Yapay Zeka (LLM) Desteği**| Yoktur. | Gemini, OpenAI (ve Ollama/DeepSeek uyumlu API'ler) ve Claude desteği. Arayüzden anlık model listesi çekebilme. |
-| **Bildirim Kanalları** | Sadece Telegram botu üzerinden bildirim gönderir. | **SMTP HTML E-posta** (sektörlere göre gruplanmış ve biçimlendirilmiş) ve **Telegram** (karakter limitlerine göre otomatik mesaj bölme). |
-| **Taşınabilirlik** | Kaynak kod olarak dağıtılır. | Tekil Windows `.exe` olarak paketlenmiştir. DB, loglar ve ayarları kendi yanında portable olarak taşır. |
-
----
-
-## 2. Kullanım Kılavuzu & Çalıştırma Yöntemleri
+## 1. Kullanım Kılavuzu & Çalıştırma Yöntemleri
 
 ### A. Masaüstü / Yerel Kullanıcılar
 Masaüstü kullanıcıları programı iki şekilde çalıştırabilir:
@@ -53,7 +37,7 @@ Uygulama konsol tabanlı bir exe olduğu için arka planda çalışırken komut 
 
 ---
 
-## 3. Sunucuya Kurulum ve Canlıya Alma (Deployment)
+## 2. Sunucuya Kurulum ve Canlıya Alma (Deployment)
 
 Uygulamanın kesintisiz 7/24 çalışması için sunucu ortamına (Windows Server veya Linux Server) kurulması önerilir.
 
@@ -144,7 +128,7 @@ Linux sunucularda (Örn: Ubuntu) systemd servis yöneticisi kullanılması en ka
 
 ---
 
-## 4. Token Tasarrufu ve LLM Maliyet Optimizasyonu
+## 3. Token Tasarrufu ve LLM Maliyet Optimizasyonu
 
 * **Sektörel Kelime Eşleşmesi (Phase 1):** Yapay zeka maliyetlerini ve token tüketimini minimumda tutmak için, **Sektörler** sekmesindeki yerel anahtar kelime tanımlarını olabildiğince daraltın.
 * **LLM Ön Elemesi:** Sistem, gelen ihaleleri önce yerel anahtar kelimelere (Phase 1) göre eler. Yalnızca bu yerel filtreyi geçen ihaleler LLM'e (Phase 2) gönderilir. Bu sayede ilgisiz ihaleler için API ücreti ödemezsiniz.
