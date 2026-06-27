@@ -1,6 +1,7 @@
 import os
 import logging
 import yaml
+from src.classifier import matches_keyword
 
 logger = logging.getLogger(__name__)
 
@@ -38,8 +39,7 @@ class TenderFilter:
         s = (summary or "").lower()
         
         for kw in self.exclude_keywords:
-            kw_lower = kw.lower()
-            if kw_lower in t or kw_lower in s:
-                logger.info(f"İhale elendi. Eşleşen kelime: '{kw_lower}' | Başlık: '{title}'")
+            if matches_keyword(kw, t) or matches_keyword(kw, s):
+                logger.info(f"İhale elendi. Eşleşen kelime: '{kw.lower()}' | Başlık: '{title}'")
                 return True
         return False

@@ -1,10 +1,20 @@
 import os
+import re
 import logging
 import json
 import yaml
 from src.llm_client import LLMClient
 
 logger = logging.getLogger(__name__)
+
+def matches_keyword(kw: str, text: str) -> bool:
+    kw_lower = kw.lower()
+    if len(kw_lower) <= 5:
+        # Enforce Turkish-safe word boundary
+        pattern = rf"(?<![a-zA-Z0-9çğışöüÇĞIŞÖÜ]){re.escape(kw_lower)}(?![a-zA-Z0-9çğışöüÇĞIŞÖÜ])"
+        return bool(re.search(pattern, text))
+    else:
+        return kw_lower in text
 
 class TenderClassifier:
     """
@@ -47,7 +57,7 @@ class TenderClassifier:
             negatives = rules.get("negative_keywords", [])
             has_negative = False
             for nw in negatives:
-                if nw.lower() in t or nw.lower() in s:
+                if matches_keyword(nw, t) or matches_keyword(nw, s):
                     has_negative = True
                     break
             if has_negative:
@@ -56,10 +66,9 @@ class TenderClassifier:
             keywords = rules.get("keywords", [])
             score = 0
             for kw in keywords:
-                kw_lower = kw.lower()
-                if kw_lower in t:
+                if matches_keyword(kw, t):
                     score += 2
-                elif kw_lower in s:
+                elif matches_keyword(kw, s):
                     score += 1
             
             if score > max_score:
