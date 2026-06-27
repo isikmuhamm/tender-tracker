@@ -13,45 +13,37 @@
 ---
 
 ## 📑 Table of Contents
-1. [Technical Evaluation / Teknik Değerlendirme](#-technical-evaluation--teknik-değerlendirme)
-2. [System Architecture](#-system-architecture)
+1. [Technical Evaluation & Engine Architecture](#-technical-evaluation--engine-architecture)
+2. [System Architecture Flow](#-system-architecture-flow)
 3. [Project Directory Structure](#-project-directory-structure)
-4. [Interface Showcases & Visual Walkthrough](#-interface-showcases--visual-walkthrough)
-5. [Installation, Setup & Deployment](#-installation-setup--deployment)
+4. [Arayüz Panelleri ve Görsel Kılavuz](#-arayüz-panelleri-ve-görsel-kılavuz)
+5. [Kurulum, Yapılandırma ve Canlı Dağıtım](#-kurulum-yapılandırma-ve-canlı-dağıtım)
+6. [Destek, Katkı ve Lisans (License & Contributing)](#-destek-katkı-ve-lisans-license--contributing)
 
 ---
 
-## 📌 Technical Evaluation / Teknik Değerlendirme
+## 📌 Technical Evaluation & Engine Architecture
 
-### **EN | Technical Evaluation and Pipeline Architecture**
-Tender Tracker is architected as an asynchronous data harvesting and processing pipeline optimized for tracking public and private tender platforms across Turkey.
-* **Asynchronous Scraper Engine:** 
-  * The system bypasses SSL/TLS handshake limitations on target public gateways by utilizing a custom `TLSAdapter` with custom cipher suites, maintaining persistent HTTP sessions.
-  * Web scraping routines query raw JSON API endpoints where available to minimize network payloads and speed up processing. Unstructured HTML data feeds are parsed using optimized regular expressions and BeautifulSoup tokenizers.
-* **Hybrid Two-Stage Filtering Strategy:**
-  * **Stage 1 (Rule-Based Matching):** Ingested tenders are parsed against local keyword definitions (positive/negative suffixes) and global exclusions. Tenders matching local criteria are categorized immediately (0ms latency, zero API token costs).
-  * **Stage 2 (Sector-Bound LLM Inference):** To optimize Large Language Model (LLM) query costs, custom prompt filters (Gemini, OpenAI, Claude) are bound to target sectors. The system only triggers LLM evaluation if a tender falls within the specified sector, decreasing monthly API costs by up to 90%.
-* **Database Background Re-evaluation:** 
-  To prevent re-hitting external websites when custom LLM filters are updated, the platform spawns background worker threads using dedicated database sessions to asynchronously evaluate already stored tenders locally.
+Tender Tracker is architected as an asynchronous data harvesting and processing pipeline optimized for tracking public and private tender platforms. It replaces manual web searches with programmatic execution, utilizing dedicated concurrency models to minimize network and token costs.
 
-### **TR | Teknik Değerlendirme ve Boru Hattı Mimarisi**
-Tender Tracker, Türkiye'deki kamu ve özel ihale platformlarından veri toplamak üzere optimize edilmiş asenkron bir veri toplama ve işleme boru hattı mimarisidir.
-* **Asenkron Tarayıcı Motoru:**
-  * Sistem, hedef kamu portallarındaki SSL/TLS el sıkışma sınırlamalarını, özel şifreleme süitleri barındıran bir `TLSAdapter` ve kalıcı HTTP oturumları kullanarak aşar.
-  * Ağ yükünü azaltmak amacıyla veri çekme işlemleri JSON API uç noktalarından doğrudan çekilir; yapılandırılmamış HTML bültenleri ise optimize edilmiş düzenli ifadeler ve BeautifulSoup kullanılarak SQLite modellerine dönüştürülür.
-* **Hibrit İki Aşamalı Filtreleme Stratejisi:**
-  * **1. Aşama (Kural Tabanlı Eşleşme):** İhaleler yerel sektörel kelimelere ve küresel yasaklı kelimelere göre taranır. Yerel kurallarla eşleşen ihaleler anında sınıflandırılır (0ms gecikme, sıfır token maliyeti).
-  * **2. Aşama (Sektör Sınırlı LLM Analizi):** Yapay Zeka maliyetlerini minimize etmek adına özel LLM süzgeçleri belirli sektörlerle eşleştirilir. LLM API çağrısı yalnızca ihale ilgili sektörle eşleştiğinde tetiklenir, böylece token tüketimi %90'a varan oranda düşürülür.
-* **Veritabanı Arka Plan Yeniden Değerlendirmesi:**
-  * Yeni bir LLM filtresi eklendiğinde veya promptlar değiştirildiğinde, dış kaynakları tekrar taramamak için sistem arka planda asenkron iş parçacıkları (`threading.Thread`) başlatarak kayıtlı ihaleleri yerel olarak yeniden analiz eder.
+### 1. Asynchronous Ingestion & Cipher Tuning
+The engine abstracts connections to heterogeneous public gateways:
+* **SSL/TLS Handshake Bypass:** Kamu (KIK/EKAP) gateways employ strict TLS fingerprinting that blocks traditional HTTP clients. Tender Tracker embeds a customized `TLSAdapter` on top of urllib3/requests to negotiate connections using specific cipher suites, preventing instant connection drops and certificate validation blocks.
+* **Payload Optimization:** Rather than scraping raw DOM trees, the engine directly queries target JSON API routes when available. HTML feeds are processed using optimized, non-backtracking regular expressions and fast BeautifulSoup tokenizers to reduce CPU overhead during parsing.
+
+### 2. Hybrid Multi-Stage Classification Pipeline
+The system implements a strict priority filter stack to manage operational costs:
+* **Stage 1 (Deterministic Keyword Rules):** Tenders are immediately evaluated against global exclusions and positive/negative suffix lists. By assigning a tender to a sector locally based on keyword suffix trees, the engine achieves instantaneous categorization with zero token cost.
+* **Stage 2 (Sector-Bound LLM Inference):** To avoid unnecessary API costs, Large Language Model (LLM) filters (Gemini, OpenAI, Claude) are tied to target sectors. If a tender is categorized into "Rail Systems", only the LLM prompt related to rail systems is executed. Non-relevant tenders bypass LLM inference completely.
+* **Background Database Re-evaluation:** Updating prompts or sector rules does not trigger website scrapes. The server spawns asynchronous worker threads (`threading.Thread`) using dedicated database sessions to re-evaluate the local SQLite database without incurring web traffic.
 
 ---
 
-## 🏗️ System Architecture
+## 🏗️ System Architecture Flow
 
 ```mermaid
 flowchart TD
-    subgraph WebSources["🌐 Public & Private Portals"]
+    subgraph WebSources["🌐 Source Gateways"]
         EKAP["EKAPv2 (TLSAdapter)"]
         ILAN["ilan.gov.tr (JSON API)"]
         YAT["Yatırımlar Dergisi (HTML)"]
@@ -114,97 +106,133 @@ tender-tracker/
 
 ---
 
-## 📸 Interface Showcases & Visual Walkthrough
+## 📸 Arayüz Panelleri ve Görsel Kılavuz
 
-### 1. Active Tenders Tab (Aktif İhaleler Paneli)
+### 1. İlk Kurulum Sihirbazı (Setup Wizard)
 
-This is the main application interface displaying all tenders harvested from the enabled sources. Users can view the titles, publication dates, and source platform tags, as well as apply client-side text searches and filter results dynamically by sector or active custom smart filters. A real-time notification indicator flashes in the sidebar if new matches are detected while away.
+Uygulama ilk defa çalıştırıldığında veya veritabanı sıfırlandığında kullanıcıyı bu karşılama ekranı karşılar. Burada sistem yöneticisi (admin) hesabı için güvenli bir kullanıcı adı ve şifre tanımlanır. Bu form gönderildikten sonra veritabanı şifrelenmiş kimlik bilgileriyle otomatik olarak ilklendirilir.
+
+![Kurulum Sihirbazı](screenshots/setup_wizard.png)
+
+<br/>
+
+### 2. Aktif İhaleler Paneli
+
+Uygulamanın ana kontrol merkezidir. Taranan kaynaklardan toplanan tüm aktif ihaleleri listeler. Kullanıcılar ihalelerin yayımlanma tarihlerini, ihale numaralarını ve hangi sektöre sınıflandırıldıklarını bu ekrandan izleyebilir. Arayüzün solundaki menüde yeni ihale tespit edildiğinde yanan kırmızı bir uyarı simgesi (bildirim noktası) yer alır.
 
 ![Aktif İhaleler](screenshots/tenders.png)
 
 <br/>
 
-### 2. Multi-Theme Configurator (Arayüz Renk Temaları)
+### 3. Genel & LLM Yapılandırma Paneli
 
-The system configuration panel features a responsive interface theme selector. Users can switch between 8 pre-designed color palettes (Turkuaz, Zümrüt, Turuncu, Mor, Gül, Kehribar, Gümüş, Kırmızı) dynamically. The chosen theme settings are written to the server's configuration file in real-time, preserving style selections across system restarts.
+Sunucunun çalışacağı port adresi, arka plan botunun tarama sıklığı (dakika bazında) ve hangi kazayıcı kaynakların (Scrapers) aktif olacağı bu sekmeden düzenlenir. Aynı zamanda, yapay zeka sınıflandırma motoru için kullanılacak olan aktif API sağlayıcısı (Gemini, OpenAI, Claude) bu ekrandan seçilir.
 
-![Arayüz Renk Temaları](screenshots/config_general.png)
+![Genel Ayarlar](screenshots/config_general.png)
 
 <br/>
 
-### 3. Custom AI Filters & Re-evaluation (Akıllı Süzgeçler)
+### 4. Arayüz Renk Temaları (8 Farklı Palet Gösterimi)
 
-This panel allows users to create targeted LLM evaluation prompts. By scoping a prompt to a specific sector, you can control where the LLM evaluates the tender description, optimizing response times and token costs. The "Yeniden Değerlendir" button triggers an asynchronous background thread that applies newly created custom prompt rules to the existing SQLite database.
+Uygulama, modern koyu tema üzerine inşa edilmiş ve sunucu ile anlık senkronize olan 8 farklı renk temasına sahiptir. Aşağıda Turkuaz (Cyan), Zümrüt (Emerald), Turuncu (Sunset) ve Mor (Purple) renk temalarının birleşik görünümü sunulmuştur. Değiştirilen tema ayarları doğrudan `config.yaml` dosyasına sunucu taraflı kaydedilir.
+
+![Arayüz Renk Temaları](screenshots/themes_showcase.png)
+
+<br/>
+
+### 5. Özel Yapay Zeka Süzgeçleri ve Yeniden Değerlendirme (LLM Prompts)
+
+Sektör filtrelerini geçen ihaleleri anlamsal olarak analiz etmek için kullanılan özel LLM promptlarının yönetildiği alandır. Promptlar belirli bir sektörle ilişkilendirilerek token tasarrufu sağlanır. "Yeniden Değerlendir" butonu, veritabanındaki mevcut ihaleleri asenkron bir arka plan iş parçacığıyla yeni kurallara göre tekrar sınıflandırır.
 
 ![Akıllı Süzgeçler](screenshots/config_filters.png)
 
 <br/>
 
-### 4. Sectors & Global Exclusion Manager (Sektörler ve Küresel Süzgeçler)
+### 6. Sektör Kuralları ve Küresel Filtreler Paneli
 
-Sectors are managed as collapsible cards showing positive matching suffixes and negative exclusion keywords. In addition, a static, editable card at the very top provides control over global exclusion phrases. Tenders containing any global negative keywords are filtered out immediately during stage 1 before being logged.
+İşletmenizin ilgi alanına giren anahtar kelimelerin (pozitif) ve istenmeyen durumların (negatif) yönetildiği kural tabanlı yapıdır. En üstte sabit olarak yer alan "Küresel Yasaklı Kelimeler" kartı, bu kelimeleri içeren ihaleleri sisteme hiç kaydetmeden ilk aşamada eler.
 
 ![Sektörler ve Filtreler](screenshots/config_sectors.png)
 
 <br/>
 
-### 5. SMTP and Telegram Settings (Bildirim Entegrasyonu)
+### 7. SMTP E-Posta ve Telegram Bildirim Paneli
 
-From this tab, the user configures SMTP mail delivery parameters and Telegram bot variables (Token and Chat ID). Tenders that pass the classification checks are grouped by sector and sent immediately. System logs will warn of missing credentials if fields are left blank.
+Sınıflandırılan ihalelerin kullanıcılara anlık olarak ulaştırılmasını sağlayan entegrasyon ayarlarıdır. SMTP sunucu bilgileri, gönderici/alıcı e-posta adresleri ve Telegram Bot belirteçleri (Token ve Chat ID) bu panelden düzenlenir. Eksik parametre girildiğinde sistem tepsisinde ve loglarda uyarılar gösterilir.
 
 ![Bildirim Ayarları](screenshots/config_notifications.png)
 
 <br/>
 
-### 6. System Logs Terminal (Olay Günlüğü)
+### 8. Şifre Güncelleme Paneli
 
-Provides an inline terminal window rendering the last 100 entries of the server log file (`events.log`). It displays active scraping cycles, classification steps, and connection errors, and is useful for real-time diagnostics. If an error is caught, a blinking warning dot appears next to the logs link on the sidebar menu.
+Kullanıcı adı ve mevcut yönetici şifresinin güvenli bir şekilde güncellendiği paneldir. Tasarım tutarlılığı açısından, bu sekmedeki form onay butonu da diğer sekmelerle aynı yapıda, sağa hizalı, yeşil vurgulu ve disket simgeli olacak şekilde tasarlanmıştır.
+
+![Şifre Güncelleme](screenshots/config_security.png)
+
+<br/>
+
+### 9. Olay Günlüğü Terminali (Live Logs Viewer)
+
+Sistem arka plan işleyişini, tarayıcı botun adımlarını, veritabanı kayıt işlemlerini ve API hata kodlarını canlı olarak izleyebileceğiniz entegre terminal arayüzüdür. Arka planda herhangi bir hata veya uyarı logu oluştuğunda sol menüdeki "Sistem Logları" sekmesinin yanında kırmızı uyarı noktası belirir.
 
 ![Sistem Logları](screenshots/logs.png)
 
 ---
 
-## 🚀 Installation, Setup & Deployment
+## 🚀 Kurulum, Yapılandırma ve Canlı Dağıtım
 
-### 1. Local Environment Setup (Python)
-To run the server and task scheduler natively from Python:
-1. Clone the repository:
+### 1. Yerel Ortam Kurulumu ve Python ile Çalıştırma
+Uygulamayı bilgisayarınızda kaynak koddan çalıştırmak için aşağıdaki adımları sırasıyla uygulayın:
+1. Depoyu yerel bilgisayarınıza klonlayın:
    ```bash
    git clone https://github.com/isikmuhamm/tender-tracker.git
    cd tender-tracker
    ```
-2. Create and activate a virtual environment:
+2. Python sanal ortamı (virtual environment) oluşturun ve aktif edin:
    ```bash
    python -m venv venv
-   # On Windows:
+   # Windows için:
    venv\Scripts\activate
-   # On macOS/Linux:
+   # macOS/Linux için:
    source venv/bin/activate
    ```
-3. Install required packages:
+3. Gerekli bağımlılık paketlerini yükleyin:
    ```bash
    pip install -r requirements.txt
    ```
-4. Run the tray controller app:
+4. Sistem tepsisi entegrasyonuyla beraber uygulamayı başlatın:
    ```bash
    python run.py
    ```
-*Access the local web panel at `http://127.0.0.1:8000` from your browser.*
+*Uygulama başladıktan sonra tarayıcınızdan `http://127.0.0.1:8000` adresine giderek kontrol paneline erişebilirsiniz.*
 
-### 2. PyInstaller Standalone Compilation
-To compile the system into a single executable that operates without Python dependencies:
-1. Run the build script:
-   ```bash
-   python build.py
-   ```
-2. Retrieve the finished executable binary from the newly generated `dist/` directory:
-   * **Windows:** `dist/tender-tracker.exe`
+### 2. PyInstaller ile Bağımsız (.exe) Dosya Derleme
+Uygulamayı herhangi bir Python kurulumuna ihtiyaç duymadan çalıştırılabilen tekil bir Windows çalıştırılabilir dosyası (.exe) haline getirmek için:
+```bash
+python build.py
+```
+Derleme bittiğinde tekil binary dosyanız `dist/tender-tracker.exe` dizini altında hazır olacaktır.
 
-### 3. Troubleshooting Guide
-* **Windows Defender / SmartScreen Warnings:** Because the standalone binary lacks an expensive commercial digital certificate, Windows Defender might identify it as untrusted. Click *"More Info"* on the popup window and select *"Run Anyway"* to start the system.
-* **Server Port Conflicts:** By default, the FastAPI web panel runs on port `8000`. If this port is occupied by another application, open the local `config.yaml` with a text editor, change the value of `server_port` to an open port (e.g. `8085`), and restart.
-* **Portable Directory Structure:** All active configurations, logs, and database records reside inside the directory containing the executable:
-  * `tenders.db` (SQLite records)
-  * `events.log` (Diagnostic outputs)
-  * `config.yaml` / `sectors.yaml` (Active parameters)
-  You can move the app to a different workstation by copying the `.exe` file along with these configuration and database files.
+### 3. Olası Hatalar ve Çözümleri (Troubleshooting)
+* **Windows Defender / SmartScreen Uyarısı:** Dijital sertifika imzası barındırmayan bağımsız derlemelerde Windows uyarı verebilir. Ayrıntılar kısmından *"Yine de Çalıştır"* seçeneğini işaretleyerek aşabilirsiniz.
+* **Sunucu Portunun Dolu Olması:** Sunucu varsayılan olarak `8000` portunu dinler. Port çakışması durumunda `config.yaml` dosyasını açıp `server_port` değerini boşta olan başka bir portla (örneğin `8085`) değiştirip programı yeniden başlatın.
+* **Verilerin Taşınabilirliği (Portable):** Uygulama tüm veritabanı kayıtlarını (`tenders.db`), logları (`events.log`) ve ayar dosyalarını (`config.yaml`, `sectors.yaml`) kendi çalıştığı dizinde oluşturur. Programı taşımak için exe dosyasıyla birlikte bu dosyaları da taşımanız yeterlidir.
+
+---
+
+## 📢 Destek, Katkı ve Lisans (License & Contributing)
+
+### Katkıda Bulunma (Contributing)
+Projenin geliştirilmesine katkıda bulunmak isterseniz:
+1. Projeyi forklayın.
+2. Yeni bir özellik veya hata giderme için branch açın (`git checkout -b feature/yeniozellik`).
+3. Değişikliklerinizi commit edin (`git commit -m 'feat: yeni özellik eklendi'`).
+4. Branch'inizi push edin (`git push origin feature/yeniozellik`).
+5. Bir Pull Request (PR) oluşturun.
+
+### Lisans (License)
+Bu proje **MIT Lisansı** altında lisanslanmıştır. Ücretsiz olarak bireysel ve ticari amaçlarla kullanılabilir, kopyalanabilir ve dağıtılabilir. Detaylar için [LICENSE](file:///c:/Users/MAHMET/Desktop/Projects/tender-tracker/LICENSE) dosyasına göz atabilirsiniz.
+
+### İletişim (Contact)
+Her türlü soru, hata bildirimi veya iş birliği talepleriniz için [isikmuhamm](https://github.com/isikmuhamm) profili üzerinden iletişime geçebilirsiniz.
