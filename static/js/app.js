@@ -108,6 +108,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let loadedConfig = null;
     let localCustomFilters = [];
     let localSectors = {};
+    let globalFiltersEnabled = true;
 
     // Theme configuration
     let selectedThemeKey = "cyan";
@@ -683,6 +684,7 @@ document.addEventListener("DOMContentLoaded", () => {
         
         localCustomFilters = filters.custom_llm_filters || [];
         localSectors = sectors;
+        globalFiltersEnabled = filters.enabled !== false;
 
         // Populate port & interval
         cfgServerPort.value = settings.server_port || 8000;
@@ -875,43 +877,68 @@ document.addEventListener("DOMContentLoaded", () => {
     // --- Sectors Accordion Sub-Module ---
     function renderSectorsAccordion() {
         sectorsAccordionContainer.innerHTML = "";
+        
+        // 1. Render Fixed Global Exclude Keywords Card
+        const globalCard = document.createElement("div");
+        globalCard.className = "sector-acc-card";
+        
+        const globalKeywords = cfgExcludeKeywords.value.split(",").map(k => k.trim()).filter(k => k);
+        
+        globalCard.innerHTML = `
+            <div class="sector-acc-header" style="border-left: 4px solid var(--primary-color);">
+                <div class="sector-acc-title">
+                    <i class="fa-solid fa-chevron-right acc-arrow"></i>
+                    <span><strong>Küresel Yasaklı Kelimeler</strong> <small style="color: var(--text-secondary); margin-left: 5px;">(Tüm ihalelerden doğrudan elenir)</small></span>
+                </div>
+                <div class="sector-acc-actions">
+                    <label class="switch" title="Küresel Yasaklı Kelimeleri Etkinleştir / Devre Dışı Bırak">
+                        <input type="checkbox" id="global-exclude-toggle" ${globalFiltersEnabled !== false ? "checked" : ""}>
+                        <span class="slider"></span>
+                    </label>
+                    <button type="button" class="btn-small-primary btn-edit-global-exclude"><i class="fa-solid fa-edit"></i> Düzenle</button>
+                </div>
+            </div>
+            <div class="sector-acc-body d-none">
+                <p style="margin-top: 15px; font-size: 13px;"><strong>Yasaklı Kelimeler:</strong> ${globalKeywords.length > 0 ? globalKeywords.join(", ") : "<em>Tanımlanmamış</em>"}</p>
+            </div>
+        `;
+        sectorsAccordionContainer.appendChild(globalCard);
+        
+        // 2. Render other sectors
         const sectorNames = Object.keys(localSectors);
         
-        if (sectorNames.length === 0) {
-            sectorsAccordionContainer.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--text-secondary);">Tanımlı sektör yok. Sektör ekle butonuyla ekleyin.</div>';
-            return;
+        if (sectorNames.length > 0) {
+            sectorNames.forEach((name) => {
+                const rules = localSectors[name] || {};
+                const keywords = rules.keywords || [];
+                const negativeKeywords = rules.negative_keywords || [];
+                
+                const card = document.createElement("div");
+                card.className = "sector-acc-card";
+                
+                card.innerHTML = `
+                    <div class="sector-acc-header">
+                        <div class="sector-acc-title">
+                            <i class="fa-solid fa-chevron-right acc-arrow"></i>
+                            <span>${name}</span>
+                        </div>
+                        <div class="sector-acc-actions">
+                            <label class="switch" title="Sektörü Etkinleştir / Devre Dışı Bırak">
+                                <input type="checkbox" class="sector-row-toggle" data-name="${name}" ${rules.enabled !== false ? "checked" : ""}>
+                                <span class="slider"></span>
+                            </label>
+                            <button type="button" class="btn-small-primary btn-edit-sector" data-name="${name}"><i class="fa-solid fa-edit"></i> Düzenle</button>
+                            <button type="button" class="btn-icon-red btn-delete-sector" data-name="${name}"><i class="fa-solid fa-trash"></i></button>
+                        </div>
+                    </div>
+                    <div class="sector-acc-body d-none">
+                        <p style="margin-top: 15px; font-size: 13px;"><strong>Anahtar Kelimeler:</strong> ${keywords.length > 0 ? keywords.join(", ") : "<em>Tanımlanmamış</em>"}</p>
+                        <p style="font-size: 13px;"><strong>Yasaklı Kelimeler:</strong> ${negativeKeywords.length > 0 ? negativeKeywords.join(", ") : "<em>Tanımlanmamış</em>"}</p>
+                    </div>
+                `;
+                sectorsAccordionContainer.appendChild(card);
+            });
         }
-
-        sectorNames.forEach((name) => {
-            const rules = localSectors[name] || {};
-            const keywords = rules.keywords || [];
-            const negativeKeywords = rules.negative_keywords || [];
-            
-            const card = document.createElement("div");
-            card.className = "sector-acc-card";
-            
-            card.innerHTML = `
-                <div class="sector-acc-header">
-                    <div class="sector-acc-title">
-                        <i class="fa-solid fa-chevron-right acc-arrow"></i>
-                        <span>${name}</span>
-                    </div>
-                    <div class="sector-acc-actions">
-                        <label class="switch" title="Sektörü Etkinleştir / Devre Dışı Bırak">
-                            <input type="checkbox" class="sector-row-toggle" data-name="${name}" ${rules.enabled !== false ? "checked" : ""}>
-                            <span class="slider"></span>
-                        </label>
-                        <button type="button" class="btn-small-primary btn-edit-sector" data-name="${name}"><i class="fa-solid fa-edit"></i> Düzenle</button>
-                        <button type="button" class="btn-icon-red btn-delete-sector" data-name="${name}"><i class="fa-solid fa-trash"></i></button>
-                    </div>
-                </div>
-                <div class="sector-acc-body d-none">
-                    <p style="margin-top: 15px; font-size: 13px;"><strong>Anahtar Kelimeler:</strong> ${keywords.length > 0 ? keywords.join(", ") : "<em>Tanımlanmamış</em>"}</p>
-                    <p style="font-size: 13px;"><strong>Yasaklı Kelimeler:</strong> ${negativeKeywords.length > 0 ? negativeKeywords.join(", ") : "<em>Tanımlanmamış</em>"}</p>
-                </div>
-            `;
-            sectorsAccordionContainer.appendChild(card);
-        });
 
         // Accordion Toggle
         document.querySelectorAll(".sector-acc-header").forEach(header => {
@@ -930,6 +957,35 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             });
         });
+
+        // Global exclude toggle switch listener
+        const globalToggle = document.getElementById("global-exclude-toggle");
+        if (globalToggle) {
+            globalToggle.addEventListener("change", async (e) => {
+                globalFiltersEnabled = globalToggle.checked;
+                await saveConfigToServer(false);
+            });
+        }
+
+        // Global exclude edit modal trigger listener
+        const editGlobalBtn = globalCard.querySelector(".btn-edit-global-exclude");
+        if (editGlobalBtn) {
+            editGlobalBtn.addEventListener("click", () => {
+                modalSectorOrigName.value = "__global_filters__";
+                modalSectorName.value = "Küresel Yasaklı Kelimeler";
+                modalSectorName.disabled = true;
+                
+                const currentKeywords = cfgExcludeKeywords.value.split(",").map(k => k.trim()).filter(k => k);
+                modalSectorKeywords.value = currentKeywords.join("\n");
+                modalSectorNegatives.value = "";
+                
+                document.getElementById("modal-sector-negatives").closest(".form-group").classList.add("d-none");
+                document.querySelector("label[for='modal-sector-keywords']").textContent = "Yasaklı Kelimeler (Her satıra bir tane yazın)";
+                
+                sectorModalTitle.textContent = "Küresel Yasaklı Kelimeler Düzenle";
+                openModal(sectorModal);
+            });
+        }
 
         // Sector row toggles
         document.querySelectorAll(".sector-row-toggle").forEach(el => {
@@ -952,8 +1008,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 
                 modalSectorOrigName.value = name;
                 modalSectorName.value = name;
+                modalSectorName.disabled = false;
                 modalSectorKeywords.value = keywords.join("\n");
                 modalSectorNegatives.value = negativeKeywords.join("\n");
+                
+                document.getElementById("modal-sector-negatives").closest(".form-group").classList.remove("d-none");
+                document.querySelector("label[for='modal-sector-keywords']").textContent = "Anahtar Kelimeler (Her satıra bir tane yazın)";
                 
                 sectorModalTitle.textContent = "Sektör Düzenle";
                 openModal(sectorModal);
@@ -978,8 +1038,13 @@ document.addEventListener("DOMContentLoaded", () => {
     btnAddSector.addEventListener("click", () => {
         modalSectorOrigName.value = "";
         modalSectorName.value = "";
+        modalSectorName.disabled = false;
         modalSectorKeywords.value = "";
         modalSectorNegatives.value = "";
+        
+        document.getElementById("modal-sector-negatives").closest(".form-group").classList.remove("d-none");
+        document.querySelector("label[for='modal-sector-keywords']").textContent = "Anahtar Kelimeler (Her satıra bir tane yazın)";
+        
         sectorModalTitle.textContent = "Yeni Sektör Ekle";
         openModal(sectorModal);
     });
@@ -987,6 +1052,17 @@ document.addEventListener("DOMContentLoaded", () => {
     sectorModalForm.addEventListener("submit", async (e) => {
         e.preventDefault();
         const origName = modalSectorOrigName.value;
+        
+        if (origName === "__global_filters__") {
+            const keywords = modalSectorKeywords.value.split("\n").map(k => k.trim()).filter(k => k);
+            cfgExcludeKeywords.value = keywords.join(", ");
+            closeModal(sectorModal);
+            renderSectorsAccordion();
+            populateMainFilters();
+            await saveConfigToServer(false);
+            return;
+        }
+        
         const newName = modalSectorName.value.trim();
         
         if (!newName) return;
@@ -1110,6 +1186,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     }
                 },
                 filters: {
+                    enabled: globalFiltersEnabled,
                     exclude_keywords: excludeList,
                     custom_llm_filters: localCustomFilters
                 }
