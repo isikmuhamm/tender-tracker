@@ -794,9 +794,10 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
         document.querySelectorAll(".filter-row-toggle").forEach(el => {
-            el.addEventListener("change", (e) => {
+            el.addEventListener("change", async (e) => {
                 const idx = parseInt(el.getAttribute("data-index"));
                 localCustomFilters[idx].enabled = el.checked;
+                await saveConfigToServer(false);
             });
         });
 
@@ -817,11 +818,12 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
         document.querySelectorAll(".btn-delete-filter").forEach(el => {
-            el.addEventListener("click", (e) => {
+            el.addEventListener("click", async (e) => {
                 const targetBtn = el.closest(".btn-delete-filter");
                 const idx = parseInt(targetBtn.getAttribute("data-index"));
                 localCustomFilters.splice(idx, 1);
                 renderCustomFiltersTable();
+                await saveConfigToServer(false);
             });
         });
     }
@@ -835,7 +837,7 @@ document.addEventListener("DOMContentLoaded", () => {
         openModal(filterModal);
     });
 
-    filterModalForm.addEventListener("submit", (e) => {
+    filterModalForm.addEventListener("submit", async (e) => {
         e.preventDefault();
         const origId = modalFilterOrigId.value;
         const newId = modalFilterId.value.trim();
@@ -867,6 +869,7 @@ document.addEventListener("DOMContentLoaded", () => {
         
         closeModal(filterModal);
         renderCustomFiltersTable();
+        await saveConfigToServer(false);
     });
 
     // --- Sectors Accordion Sub-Module ---
@@ -930,10 +933,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Sector row toggles
         document.querySelectorAll(".sector-row-toggle").forEach(el => {
-            el.addEventListener("change", (e) => {
+            el.addEventListener("change", async (e) => {
                 const name = el.getAttribute("data-name");
                 if (localSectors[name]) {
                     localSectors[name].enabled = el.checked;
+                    await saveConfigToServer(false);
                 }
             });
         });
@@ -958,13 +962,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Delete Sector
         document.querySelectorAll(".btn-delete-sector").forEach(btn => {
-            btn.addEventListener("click", (e) => {
+            btn.addEventListener("click", async (e) => {
                 const targetBtn = btn.closest(".btn-delete-sector");
                 const name = targetBtn.getAttribute("data-name");
                 if (confirm(`"${name}" sektörünü silmek istediğinize emin misiniz?`)) {
                     delete localSectors[name];
                     renderSectorsAccordion();
                     populateMainFilters();
+                    await saveConfigToServer(false);
                 }
             });
         });
@@ -979,7 +984,7 @@ document.addEventListener("DOMContentLoaded", () => {
         openModal(sectorModal);
     });
 
-    sectorModalForm.addEventListener("submit", (e) => {
+    sectorModalForm.addEventListener("submit", async (e) => {
         e.preventDefault();
         const origName = modalSectorOrigName.value;
         const newName = modalSectorName.value.trim();
@@ -1009,6 +1014,12 @@ document.addEventListener("DOMContentLoaded", () => {
         closeModal(sectorModal);
         renderSectorsAccordion();
         populateMainFilters();
+        await saveConfigToServer(false);
+    });
+
+    // Exclude keywords auto-save on change
+    cfgExcludeKeywords.addEventListener("change", async () => {
+        await saveConfigToServer(false);
     });
 
     // Change Password submit
@@ -1043,10 +1054,11 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // Save Configuration Submit Form
-    configForm.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        configAlert.classList.add("d-none");
+    // Save Configuration Helper
+    async function saveConfigToServer(showAlerts = true) {
+        if (showAlerts) {
+            configAlert.classList.add("d-none");
+        }
 
         // Format email recipients back to list
         const recipientsList = cfgMailRecipients.value.split(",").map(r => r.trim()).filter(r => r);
@@ -1112,19 +1124,32 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
         if (response && response.ok) {
-            configAlert.textContent = "Ayarlar başarıyla kaydedildi. Değişikliklerin sunucuda aktifleşmesi için sunucu yeniden başlatılmalı veya tarama beklenmeli.";
-            configAlert.className = "alert-msg success";
-            configAlert.classList.remove("d-none");
+            if (showAlerts) {
+                configAlert.textContent = "Ayarlar başarıyla kaydedildi. Değişikliklerin sunucuda aktifleşmesi için sunucu yeniden başlatılmalı veya tarama beklenmeli.";
+                configAlert.className = "alert-msg success";
+                configAlert.classList.remove("d-none");
+            }
             showToast("Ayarlar sunucuya kaydedildi.");
             
             // Reload local settings to ensure clean state
             loadConfigFromServer();
-        } else if (response) {
-            const errData = await response.json();
-            configAlert.textContent = errData.detail || "Yapılandırma kaydedilemedi!";
-            configAlert.className = "alert-msg error";
-            configAlert.classList.remove("d-none");
+            return true;
+        } else {
+            if (response && showAlerts) {
+                const errData = await response.json();
+                configAlert.textContent = errData.detail || "Yapılandırma kaydedilemedi!";
+                configAlert.className = "alert-msg error";
+                configAlert.classList.remove("d-none");
+            }
+            showToast("Ayarlar kaydedilemedi!");
+            return false;
         }
+    }
+
+    // Save Configuration Submit Form
+    configForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        await saveConfigToServer(true);
     });
 
     // =========================================================
