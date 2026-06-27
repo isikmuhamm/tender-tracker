@@ -106,45 +106,56 @@ class TenderBotOrchestrator:
                                 email_sent=True,  # Bildirim gitmesin diye baştan True yapıyoruz
                                 telegram_sent=True
                             )
-                            db.add(new_tender)
+                            try:
+                                db.add(new_tender)
+                                db.commit()
+                                logger.info(f"Elenen ihale kaydedildi (Excluded): {item['title'][:40]}...")
+                            except Exception as db_err:
+                                db.rollback()
+                                logger.error(f"Elenen ihale veritabanına kaydedilirken hata oluştu: {db_err}")
                             continue
                             
-                        # Sektörel Sınıflandırma
-                        sector, method = self.classifier.classify(item["title"], item["summary"])
-                        
-                        # Özel Akıllı Süzgeçler (LLM) değerlendirmesi
-                        matched_filters_str = None
-                        if sector and sector != "Excluded" and custom_filters:
-                            matched_ids = self.classifier.evaluate_custom_filters(
-                                item["title"], item["summary"], custom_filters, sector=sector
+                        try:
+                            # Sektörel Sınıflandırma
+                            sector, method = self.classifier.classify(item["title"], item["summary"])
+                            
+                            # Özel Akıllı Süzgeçler (LLM) değerlendirmesi
+                            matched_filters_str = None
+                            if sector and sector != "Excluded" and custom_filters:
+                                matched_ids = self.classifier.evaluate_custom_filters(
+                                    item["title"], item["summary"], custom_filters, sector=sector
+                                )
+                                if matched_ids:
+                                    matched_filters_str = ",".join(matched_ids)
+                                    logger.info(f"İhale akıllı süzgeçlerle eşleşti: {matched_ids} | '{item['title'][:40]}...'")
+                            
+                            # Veritabanına kaydet
+                            new_tender = Tender(
+                                link=item["link"],
+                                title=item["title"],
+                                summary=item["summary"],
+                                category=item["category"],
+                                source=item["source"],
+                                sector=sector,
+                                classification_method=method,
+                                matched_custom_filters=matched_filters_str
                             )
-                            if matched_ids:
-                                matched_filters_str = ",".join(matched_ids)
-                                logger.info(f"İhale akıllı süzgeçlerle eşleşti: {matched_ids} | '{item['title'][:40]}...'")
-                        
-                        # Veritabanına kaydet
-                        new_tender = Tender(
-                            link=item["link"],
-                            title=item["title"],
-                            summary=item["summary"],
-                            category=item["category"],
-                            source=item["source"],
-                            sector=sector,
-                            classification_method=method,
-                            matched_custom_filters=matched_filters_str
-                        )
-                        db.add(new_tender)
-                        db.commit() # Her kayıtta commit ederek veritabanı durumunu güncel tutalım
-                        
-                        if sector:  # Sadece bir sektöre atanan ihaleleri bildirim listesine ekle
-                            new_tenders_added.append({
-                                "link": item["link"],
-                                "title": item["title"],
-                                "summary": item["summary"],
-                                "category": item["category"],
-                                "source": item["source"],
-                                "sector": sector
-                            })
+                            db.add(new_tender)
+                            db.commit() # Her kayıtta commit ederek veritabanı durumunu güncel tutalım
+                            logger.info(f"İhale başarıyla kaydedildi: {item['title'][:40]}...")
+                            
+                            if sector:  # Sadece bir sektöre atanan ihaleleri bildirim listesine ekle
+                                new_tenders_added.append({
+                                    "link": item["link"],
+                                    "title": item["title"],
+                                    "summary": item["summary"],
+                                    "category": item["category"],
+                                    "source": item["source"],
+                                    "sector": sector
+                                })
+                        except Exception as tender_err:
+                            db.rollback()
+                            logger.error(f"İhale işlenirken veya kaydedilirken hata oluştu: {tender_err}")
                             
                 except Exception as e:
                     logger.error(f"{scraper.source_name} tarama döngüsünde hata oluştu: {e}", exc_info=True)
@@ -173,10 +184,18 @@ class TenderBotOrchestrator:
             email_notifier = next((n for n in self.notifiers if n.name == "email"), None)
             if email_notifier:
                 email_list = [self._to_dict(t) for t in unsent_email]
-                if email_notifier.send_notification(email_list):
-                    for t in unsent_email:
-                        t.email_sent = True
-                    db.commit()
+                try:
+                    logger.info("E-posta bildirimi gönderiliyor...")
+                    if email_notifier.send_notification(email_list):
+                        for t in unsent_email:
+                            t.email_sent = True
+                        db.commit()
+                        logger.info("E-posta bildirim durumu veritabanında güncellendi.")
+                    else:
+                        logger.warning("E-posta bildirimi gönderilemedi (send_notification False döndü).")
+                except Exception as notify_err:
+                    db.rollback()
+                    logger.error(f"E-posta bildirimi gönderilirken hata oluştu: {notify_err}")
 
         # 2. Telegram için gönderilmeyenleri bul
         unsent_telegram = db.query(Tender).filter(
@@ -189,10 +208,18 @@ class TenderBotOrchestrator:
             telegram_notifier = next((n for n in self.notifiers if n.name == "telegram"), None)
             if telegram_notifier:
                 tg_list = [self._to_dict(t) for t in unsent_telegram]
-                if telegram_notifier.send_notification(tg_list):
-                    for t in unsent_telegram:
-                        t.telegram_sent = True
-                    db.commit()
+                try:
+                    logger.info("Telegram bildirimi gönderiliyor...")
+                    if telegram_notifier.send_notification(tg_list):
+                        for t in unsent_telegram:
+                            t.telegram_sent = True
+                        db.commit()
+                        logger.info("Telegram bildirim durumu veritabanında güncellendi.")
+                    else:
+                        logger.warning("Telegram bildirimi gönderilemedi (send_notification False döndü).")
+                except Exception as notify_err:
+                    db.rollback()
+                    logger.error(f"Telegram bildirimi gönderilirken hata oluştu: {notify_err}")
 
     @staticmethod
     def _to_dict(tender: Tender) -> dict:
