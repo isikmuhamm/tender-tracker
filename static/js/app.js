@@ -534,28 +534,28 @@ document.addEventListener("DOMContentLoaded", () => {
                 const filterIds = t.matched_custom_filters.split(",");
                 filterIds.forEach(fid => {
                     const filterName = getCustomFilterName(fid);
-                    customBadgesHtml += `<span class="custom-badge"><i class="fa-solid fa-bolt"></i> ${filterName}</span>`;
+                    customBadgesHtml += `<span class="custom-badge"><i class="fa-solid fa-bolt"></i> ${escapeHtml(filterName)}</span>`;
                 });
             }
 
             card.innerHTML = `
                 <div class="tender-card-header">
-                    <h3>${t.title}</h3>
+                    <h3>${escapeHtml(t.title)}</h3>
                     <div class="tender-badges">
-                        <span class="badge badge-source">${t.source}</span>
-                        ${t.sector ? `<span class="badge badge-sector">${t.sector}</span>` : ""}
+                        <span class="badge badge-source">${escapeHtml(t.source)}</span>
+                        ${t.sector ? `<span class="badge badge-sector">${escapeHtml(t.sector)}</span>` : ""}
                     </div>
                 </div>
                 <div class="tender-card-body">
-                    <p>${t.summary || "Açıklama veya ek bilgi bulunmuyor."}</p>
+                    <p>${t.summary ? escapeHtml(t.summary) : "Açıklama veya ek bilgi bulunmuyor."}</p>
                     <div class="custom-badges-container">${customBadgesHtml}</div>
                 </div>
                 <div class="tender-card-footer">
                     <div class="tender-meta">
-                        <span><i class="fa-solid fa-calendar-days"></i> ${formattedDate}</span>
-                        ${t.category ? `<span><i class="fa-solid fa-bookmark"></i> ${t.category}</span>` : ""}
+                        <span><i class="fa-solid fa-calendar-days"></i> ${escapeHtml(formattedDate)}</span>
+                        ${t.category ? `<span><i class="fa-solid fa-bookmark"></i> ${escapeHtml(t.category)}</span>` : ""}
                     </div>
-                    <a href="${t.link}" target="_blank" class="btn-link">Detay <i class="fa-solid fa-arrow-up-right-from-square"></i></a>
+                    <a href="${escapeHtml(safeLink(t.link))}" target="_blank" class="btn-link">Detay <i class="fa-solid fa-arrow-up-right-from-square"></i></a>
                 </div>
             `;
             tendersGrid.appendChild(card);
@@ -821,9 +821,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
         localCustomFilters.forEach((f, idx) => {
             const tr = document.createElement("tr");
+            const escapedName = escapeHtml(f.name || "");
+            const escapedId = escapeHtml(f.id || "");
+            const escapedSector = escapeHtml(f.target_sector === "all" || !f.target_sector ? "Tüm Sektörler" : f.target_sector);
+            const escapedInstruction = escapeHtml(f.prompt_instruction || "");
+
             tr.innerHTML = `
-                <td><strong>${f.name || ""}</strong><br><small style="color: var(--text-secondary)">ID: ${f.id} | Sektör: ${f.target_sector === "all" || !f.target_sector ? "Tüm Sektörler" : f.target_sector}</small></td>
-                <td>${f.prompt_instruction || ""}</td>
+                <td><strong>${escapedName}</strong><br><small style="color: var(--text-secondary)">ID: ${escapedId} | Sektör: ${escapedSector}</small></td>
+                <td>${escapedInstruction}</td>
                 <td style="text-align: center;">
                     <label class="switch">
                         <input type="checkbox" class="filter-row-toggle" data-index="${idx}" ${f.enabled !== false ? "checked" : ""}>
@@ -950,6 +955,9 @@ document.addEventListener("DOMContentLoaded", () => {
         globalCard.className = "sector-acc-card";
         
         const globalKeywords = cfgExcludeKeywords.value.split(",").map(k => k.trim()).filter(k => k);
+        const escapedGlobalKeywords = globalKeywords.length > 0 
+            ? globalKeywords.map(k => escapeHtml(k)).join(", ") 
+            : "<em>Tanımlanmamış</em>";
         
         globalCard.innerHTML = `
             <div class="sector-acc-header" style="border-left: 4px solid var(--primary-color);">
@@ -966,7 +974,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 </div>
             </div>
             <div class="sector-acc-body d-none">
-                <p style="margin-top: 15px; font-size: 13px;"><strong>Yasaklı Kelimeler:</strong> ${globalKeywords.length > 0 ? globalKeywords.join(", ") : "<em>Tanımlanmamış</em>"}</p>
+                <p style="margin-top: 15px; font-size: 13px;"><strong>Yasaklı Kelimeler:</strong> ${escapedGlobalKeywords}</p>
             </div>
         `;
         sectorsAccordionContainer.appendChild(globalCard);
@@ -980,6 +988,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 const keywords = rules.keywords || [];
                 const negativeKeywords = rules.negative_keywords || [];
                 
+                const escapedName = escapeHtml(name);
+                const escapedKeywords = keywords.length > 0 
+                    ? keywords.map(k => escapeHtml(k)).join(", ") 
+                    : "<em>Tanımlanmamış</em>";
+                const escapedNegKeywords = negativeKeywords.length > 0 
+                    ? negativeKeywords.map(k => escapeHtml(k)).join(", ") 
+                    : "<em>Tanımlanmamış</em>";
+                
                 const card = document.createElement("div");
                 card.className = "sector-acc-card";
                 
@@ -987,20 +1003,20 @@ document.addEventListener("DOMContentLoaded", () => {
                     <div class="sector-acc-header">
                         <div class="sector-acc-title">
                             <i class="fa-solid fa-chevron-right acc-arrow"></i>
-                            <span>${name}</span>
+                            <span>${escapedName}</span>
                         </div>
                         <div class="sector-acc-actions">
                             <label class="switch" title="Sektörü Etkinleştir / Devre Dışı Bırak">
-                                <input type="checkbox" class="sector-row-toggle" data-name="${name}" ${rules.enabled !== false ? "checked" : ""}>
+                                <input type="checkbox" class="sector-row-toggle" data-name="${escapedName}" ${rules.enabled !== false ? "checked" : ""}>
                                 <span class="slider"></span>
                             </label>
-                            <button type="button" class="btn-small-primary btn-edit-sector" data-name="${name}"><i class="fa-solid fa-edit"></i> Düzenle</button>
-                            <button type="button" class="btn-icon-red btn-delete-sector" data-name="${name}"><i class="fa-solid fa-trash"></i></button>
+                            <button type="button" class="btn-small-primary btn-edit-sector" data-name="${escapedName}"><i class="fa-solid fa-edit"></i> Düzenle</button>
+                            <button type="button" class="btn-icon-red btn-delete-sector" data-name="${escapedName}"><i class="fa-solid fa-trash"></i></button>
                         </div>
                     </div>
                     <div class="sector-acc-body d-none">
-                        <p style="margin-top: 15px; font-size: 13px;"><strong>Anahtar Kelimeler:</strong> ${keywords.length > 0 ? keywords.join(", ") : "<em>Tanımlanmamış</em>"}</p>
-                        <p style="font-size: 13px;"><strong>Yasaklı Kelimeler:</strong> ${negativeKeywords.length > 0 ? negativeKeywords.join(", ") : "<em>Tanımlanmamış</em>"}</p>
+                        <p style="margin-top: 15px; font-size: 13px;"><strong>Anahtar Kelimeler:</strong> ${escapedKeywords}</p>
+                        <p style="font-size: 13px;"><strong>Yasaklı Kelimeler:</strong> ${escapedNegKeywords}</p>
                     </div>
                 `;
                 sectorsAccordionContainer.appendChild(card);
