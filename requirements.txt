@@ -12,3 +12,5 @@ pyjwt
 bcrypt
 pyinstaller
 httpx
+pystray
+pillow
