@@ -109,6 +109,45 @@ document.addEventListener("DOMContentLoaded", () => {
     let localCustomFilters = [];
     let localSectors = {};
 
+    // Theme configuration
+    let selectedThemeKey = "cyan";
+    const themes = {
+        cyan: { primary: "#38bdf8", glow: "rgba(56, 189, 248, 0.15)" },
+        emerald: { primary: "#10b981", glow: "rgba(16, 185, 129, 0.15)" },
+        sunset: { primary: "#f97316", glow: "rgba(249, 115, 22, 0.15)" },
+        purple: { primary: "#a855f7", glow: "rgba(168, 85, 247, 0.15)" },
+        rose: { primary: "#f43f5e", glow: "rgba(244, 63, 94, 0.15)" },
+        amber: { primary: "#f59e0b", glow: "rgba(245, 158, 11, 0.15)" },
+        slate: { primary: "#94a3b8", glow: "rgba(148, 163, 184, 0.15)" },
+        crimson: { primary: "#ef4444", glow: "rgba(239, 68, 68, 0.15)" }
+    };
+
+    function applyTheme(themeKey) {
+        selectedThemeKey = themeKey;
+        const theme = themes[themeKey] || themes.cyan;
+        const root = document.documentElement;
+        root.style.setProperty('--primary-color', theme.primary);
+        root.style.setProperty('--primary-glow', theme.glow);
+        
+        // Update active class on theme picker buttons
+        document.querySelectorAll(".theme-btn").forEach(btn => {
+            if (btn.getAttribute("data-theme") === themeKey) {
+                btn.classList.add("active");
+            } else {
+                btn.classList.remove("active");
+            }
+        });
+    }
+
+    // Theme selector click interception
+    document.addEventListener("click", e => {
+        const themeBtn = e.target.closest(".theme-btn");
+        if (themeBtn) {
+            const themeKey = themeBtn.getAttribute("data-theme");
+            applyTheme(themeKey);
+        }
+    });
+
     // =========================================================
     // STARTUP SETUP CHECK & AUTH FLOW
     // =========================================================
@@ -614,6 +653,10 @@ document.addEventListener("DOMContentLoaded", () => {
         cfgServerPort.value = settings.server_port || 8000;
         cfgCheckInterval.value = settings.check_interval_minutes || 60;
         
+        // Apply theme loaded from config
+        const themeKey = settings.theme || "cyan";
+        applyTheme(themeKey);
+        
         // Populate scrapers checkboxes
         const enabledScrapers = settings.enabled_scrapers || [];
         document.getElementById("cfg-scraper-yatirimlar").checked = enabledScrapers.includes("yatirimlar");
@@ -988,6 +1031,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     check_interval_minutes: parseInt(cfgCheckInterval.value) || 60,
                     server_port: parseInt(cfgServerPort.value) || 8000,
                     active_llm_provider: cfgLlmProvider.value,
+                    theme: selectedThemeKey,
                     llm_providers: {
                         gemini: {
                             api_key: cfgGeminiKey.value.trim(),
