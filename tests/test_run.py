@@ -8,11 +8,13 @@ def test_get_check_interval(tmp_path, monkeypatch):
     config_file = tmp_path / "config.yaml"
     
     with patch("run.get_data_path", return_value=str(config_file)):
+        # 1. Default fallback when no config and no env exists
+        if config_file.exists():
+            config_file.unlink()
+        monkeypatch.delenv("CHECK_INTERVAL_MINUTES", raising=False)
         assert get_check_interval() == 60
         
-        monkeypatch.setenv("CHECK_INTERVAL_MINUTES", "45")
-        assert get_check_interval() == 45
-        
+        # 2. Legacy config key fallback
         config_data = {
             "settings": {
                 "check_interval": 30
@@ -20,8 +22,22 @@ def test_get_check_interval(tmp_path, monkeypatch):
         }
         with open(config_file, "w", encoding="utf-8") as f:
             yaml.safe_dump(config_data, f)
-            
         assert get_check_interval() == 30
+        
+        # 3. Canonical config key priority over legacy config key
+        config_data_canonical = {
+            "settings": {
+                "check_interval_minutes": 15,
+                "check_interval": 30
+            }
+        }
+        with open(config_file, "w", encoding="utf-8") as f:
+            yaml.safe_dump(config_data_canonical, f)
+        assert get_check_interval() == 15
+        
+        # 4. ENV variable priority over config (ENV > config precedence)
+        monkeypatch.setenv("CHECK_INTERVAL_MINUTES", "45")
+        assert get_check_interval() == 45
 
 @patch("run.SessionLocal")
 @patch("run.init_db")

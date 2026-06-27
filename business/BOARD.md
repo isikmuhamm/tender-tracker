@@ -84,12 +84,10 @@ events.log       local operational log
 
 Work on one item at a time unless explicitly asked to batch related fixes.
 
-1. **P0.3 Untrusted Content Rendering Guard**
-2. **P0.4 TLS And Credential Transport Cleanup**
-3. **P0.5 Persistence And Transaction Integrity**
-4. **P0.6 Scan And Re-Evaluation Mutual Exclusion**
-5. **P0.7 Supported Runtime Path Consistency**
-6. **P0.2 EKAP Public Tender Extraction**
+1. **P0.4 TLS And Credential Transport Cleanup (Harden / Verification Follow-up)**
+2. **P0.6 Scan And Re-Evaluation Mutual Exclusion (Harden / Verification Follow-up)**
+3. **P0.7 Supported Runtime Path Consistency (Harden / Verification Follow-up)**
+4. **P0.2 EKAP Public Tender Extraction**
 
 The first five items harden the already operational product. P0.2 expands source coverage after the current runtime is safer and more deterministic.
 
@@ -119,90 +117,55 @@ The first five items harden the already operational product. P0.2 expands source
 - EKAP failure does not interrupt the remaining source adapters;
 - README source status changes from Experimental only after tests pass.
 
-### P0.3 Untrusted Content Rendering Guard
-
-**Status:** Ready for implementation
-
-**Objective:** Treat tender titles, summaries, categories, sectors, source labels, custom-filter labels, and links as untrusted external data.
-
-**Why this is critical:** Scraped content is rendered inside an authenticated local dashboard that can access configuration and provider credentials. Raw HTML insertion creates a stored-XSS path even in a local-first application.
-
-**Acceptance criteria:**
-
-- dashboard uses safe DOM construction or explicit escaping rather than inserting source values into raw `innerHTML`;
-- only `http:` and `https:` tender links are rendered as clickable URLs;
-- email and Telegram HTML fields are escaped;
-- malicious title, summary, sector, source, and link fixtures render as text and never execute;
-- existing visual layout and user workflow remain intact.
-
 ### P0.4 TLS And Credential Transport Cleanup
 
-**Status:** Ready for implementation
+**Status:** Active (In Progress — Harden / Verification Follow-up)
 
 **Objective:** Restore normal certificate verification for trusted provider APIs and stop moving credentials through URL query parameters.
 
-**Why this is critical:** Disabling TLS verification for LLM providers weakens the confidentiality of user-owned API keys and prompt content. Query-string keys can also appear in browser history, proxies, or access logs.
+**Completed in this phase:**
+- Gemini, OpenAI-compatible, and Anthropic provider APIs TLS validation enabled.
+- Log secrets redacted with `HIDDEN_KEY` for exceptions.
+- Local client `/api/models` uses `X-API-Key` header instead of URL parameters.
+- Gemini model listings updated to pass key via secure `x-goog-api-key` header rather than URL query.
+- Exception handlers in `/api/models` redact secrets in case of requests/HTTP errors.
+- Mock-based test suite checks header mapping and log redaction.
 
-**Acceptance criteria:**
-
-- Gemini, OpenAI-compatible, Anthropic, and Telegram calls use normal TLS verification;
-- global suppression of certificate warnings is removed;
-- any legacy source compatibility mode is isolated to that source, explicit, and logged;
-- `/api/models` does not require an API key in a URL query string;
-- provider keys are never included in logs or exception messages;
-- existing BYO-LLM configuration continues to work locally.
-
-### P0.5 Persistence And Transaction Integrity
-
-**Status:** Ready for implementation
-
-**Objective:** Ensure every accepted or excluded tender is committed predictably and notification failures cannot discard ingestion results.
-
-**Why this is critical:** The current control flow can add an excluded record and continue before an explicit commit. If no later commit occurs, a run containing only excluded records can finish without persisting them. Persistence and notification side effects also need a clear boundary.
-
-**Acceptance criteria:**
-
-- an ingestion run containing only excluded tenders persists those records;
-- one source failure does not roll back successfully processed records from another source;
-- notification failure does not remove or roll back stored tenders;
-- transaction boundaries are explicit and covered by behavior tests;
-- duplicate handling remains stable across repeated runs;
-- tests cover excluded-only, notifier-disabled, notifier-failed, and partial-source-failure scenarios.
+**Remaining follow-up:**
+- Credential validation follow-up: ensure that no new external services or endpoints introduce query-string API keys.
 
 ### P0.6 Scan And Re-Evaluation Mutual Exclusion
 
-**Status:** Ready for implementation
+**Status:** Active (In Progress — Harden / Verification Follow-up)
 
 **Objective:** Prevent overlapping manual scans, recurring scans, and stored-tender re-evaluation jobs from racing against the same local database and configuration.
 
-**Why this is critical:** The dashboard can start background threads without one authoritative job state. Repeated clicks or concurrent job types can create duplicate work, inconsistent status, and avoidable SQLite contention.
+**Completed in this phase:**
+- Authoritative in-memory `JobState` manager and thread safety lock added to `app.py`.
+- REST endpoint `/api/job/status` and active status polling (2s interval) added to the SPA UI.
+- API endpoints return `409 Conflict` when meşgul.
+- Structured `RunResult` (successful/failed sources, added records, notifications errors) returned by `run_once()`.
+- Process-safe file lock `ProcessLock` (`tender_tracker_scan.lock` using exclusive filesystem file handle and active PID checks) coordinates dashboard scanning threads with CLI daemon iterations.
+- CLI daemon respects process lock, skips iteration with warning when lock is held.
 
-**Acceptance criteria:**
-
-- one authoritative local job state exists;
-- a second conflicting start is rejected or deliberately queued;
-- scan and re-evaluation cannot mutate the same records concurrently;
-- UI shows actual running, completed, and failed states rather than a fixed-delay assumption;
-- job failure returns the system to a recoverable state and remains visible in logs;
-- clean application shutdown does not leave a job marked permanently active.
+**Remaining follow-up:**
+- Verification follow-up: test with actual separate running OS processes (e.g. running daemon via task scheduler and dashboard concurrently).
 
 ### P0.7 Supported Runtime Path Consistency
 
-**Status:** Ready for implementation
+**Status:** Active (In Progress — Harden / Verification Follow-up)
 
 **Objective:** Make the dashboard, CLI, daemon, tray, and packaged executable behavior explicit and internally consistent.
 
-**Why this is critical:** A supported command must either work or be removed from public guidance. The daemon path currently references `os.getenv` without importing `os`, and recurring execution behavior is not unified with the packaged dashboard lifecycle.
+**Completed in this phase:**
+- Resolved missing `os` import crash in `run.py`.
+- Safe Ctrl+C SIGINT handling wrapping entire daemon loop (scan + sleep) to exit with `sys.exit(0)`.
+- Precedence rules established: `ENV > config.yaml check_interval_minutes > check_interval > default (60 dk)`.
+- CLI command arguments and run flows covered by unit tests in `tests/test_run.py`.
+- Documentation updated to explicitly present `--daemon` CLI commands and default options.
 
-**Acceptance criteria:**
-
-- `run.py --once` works and exits predictably;
-- `run.py --stats` works without initializing unrelated runtime services;
-- `run.py --daemon` either works with a documented interval source or is deliberately removed/deprecated;
-- missing imports and guaranteed runtime exceptions are fixed;
-- README commands match actual entry-point behavior;
-- packaged desktop behavior does not claim recurring scans unless that behavior is verified;
-- targeted tests or a smoke harness cover each supported entry path.
+**Remaining follow-up:**
+- Lifecycle follow-up: verify daemon integration inside the PyInstaller packaging workflow.
 
 ## Active Decisions
 
@@ -314,3 +277,9 @@ Detailed rationale and architecture hypotheses live in `NOTES.md`, Records 026�
 
 ### C-008 Product UI And Public Documentation
 **Status:** Completed — responsive themed dashboard, routing, screenshots, user guide, MIT license, and explicit active-development positioning.
+
+### C-009 Untrusted Content Rendering Guard (P0.3)
+**Status:** Completed — implemented HTML escaping (`escapeHtml`) and link scheme sanitization (`safeLink`) in the SPA UI, SMTP email client, and Telegram notifier. Handled tabnabbing via `rel="noopener noreferrer"`. Verified via HTML payloads unit tests and DOM extraction Node.js tests.
+
+### C-010 Persistence And Transaction Integrity (P0.5)
+**Status:** Completed — isolated record database commits inside per-tender try-except blocks, ensured immediate commits for excluded-only runs, and decoupled notification delivery errors from database transactions. Verified via multi-scenario tests.

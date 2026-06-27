@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
+from unittest.mock import patch, MagicMock
 from src.database import Base, get_db, User
 from app import app
 
@@ -174,7 +175,18 @@ def test_trigger_scraper(client):
         time.sleep(0.2)
         mock_run_once.assert_called_once()
 
-def test_get_models_endpoint(client):
+@patch("requests.get")
+def test_get_models_endpoint(mock_get, client):
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {
+        "models": [
+            {"name": "models/gemini-1.5-flash", "supportedGenerationMethods": ["generateContent"]},
+            {"name": "models/gemini-1.5-pro", "supportedGenerationMethods": ["generateContent"]}
+        ]
+    }
+    mock_get.return_value = mock_resp
+
     login_resp = client.post(
         "/api/auth/login",
         data={"username": "admin", "password": "admin"}
@@ -183,12 +195,20 @@ def test_get_models_endpoint(client):
     
     response = client.get(
         "/api/models?provider=gemini",
-        headers={"Authorization": f"Bearer {token}"}
+        headers={
+            "Authorization": f"Bearer {token}",
+            "X-API-Key": "test_key"
+        }
     )
     assert response.status_code == 200
     data = response.json()
     assert "models" in data
     assert "gemini-1.5-flash" in data["models"]
+    
+    mock_get.assert_called_once()
+    args, kwargs = mock_get.call_args
+    assert "generativelanguage.googleapis.com" in args[0]
+    assert "?key=" not in args[0]
 
 def test_catchall_frontend_routes(client):
     response = client.get("/tenders")
@@ -200,7 +220,17 @@ def test_catchall_frontend_routes(client):
     response3 = client.get("/api/nonexistent")
     assert response3.status_code == 404
 
-def test_get_models_with_header_key(client):
+@patch("requests.get")
+def test_get_models_with_header_key(mock_get, client):
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {
+        "models": [
+            {"name": "models/gemini-1.5-flash", "supportedGenerationMethods": ["generateContent"]}
+        ]
+    }
+    mock_get.return_value = mock_resp
+
     login_resp = client.post(
         "/api/auth/login",
         data={"username": "admin", "password": "admin"}
@@ -217,6 +247,38 @@ def test_get_models_with_header_key(client):
     assert response.status_code == 200
     data = response.json()
     assert "models" in data
+    
+    mock_get.assert_called_once()
+    args, kwargs = mock_get.call_args
+    assert kwargs["headers"]["x-goog-api-key"] == "mock_api_key"
+    assert "?key=" not in args[0]
+
+@patch("requests.get")
+def test_get_models_exception_redaction(mock_get, client):
+    mock_get.side_effect = Exception("Failed connecting to https://generativelanguage.googleapis.com/v1beta/models?key=super_secret_key_123")
+    
+    login_resp = client.post(
+        "/api/auth/login",
+        data={"username": "admin", "password": "admin"}
+    )
+    token = login_resp.json()["access_token"]
+    
+    with patch("logging.error") as mock_log_error:
+        response = client.get(
+            "/api/models?provider=gemini",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "X-API-Key": "super_secret_key_123"
+            }
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert "models" in data
+        
+        mock_log_error.assert_called_once()
+        log_msg = mock_log_error.call_args[0][0]
+        assert "super_secret_key_123" not in log_msg
+        assert "HIDDEN_KEY" in log_msg
 
 def test_job_status_and_mutual_exclusion(client):
     login_resp = client.post(
@@ -247,4 +309,36 @@ def test_job_status_and_mutual_exclusion(client):
     status_resp = client.get("/api/job/status", headers=headers)
     assert status_resp.json()["status"] == "idle"
     assert status_resp.json()["last_run_status"] == "success"
+
+def test_process_lock_concurrency(client):
+    from src.process_lock import ProcessLock
+    lock1 = ProcessLock("scan")
+    lock2 = ProcessLock("scan")
+    
+    lock1.release()
+    
+    assert lock1.acquire() is True
+    assert lock2.acquire() is False
+    
+    login_resp = client.post(
+        "/api/auth/login",
+        data={"username": "admin", "password": "admin"}
+    )
+    token = login_resp.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    
+    trigger_resp = client.post("/api/tenders/trigger", headers=headers)
+    assert trigger_resp.status_code == 409
+    assert "meşgul" in trigger_resp.json()["detail"] or "meşgul" in trigger_resp.json()["detail"].lower()
+    
+    lock1.release()
+    assert lock2.acquire() is True
+    lock2.release()
+
+def test_frontend_xss_via_node():
+    import subprocess
+    import os
+    js_test_path = os.path.join(os.path.dirname(__file__), "test_frontend_xss.js")
+    result = subprocess.run(["node", js_test_path], capture_output=True, text=True)
+    assert result.returncode == 0, f"Frontend XSS JS tests failed: {result.stderr}\nOutput: {result.stdout}"
 

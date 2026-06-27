@@ -78,6 +78,9 @@ class TenderBotOrchestrator:
                 logger.error(f"Yapılandırmadan akıllı süzgeçler yüklenirken hata: {e}")
 
         new_tenders_added = []
+        successful_sources = 0
+        failed_sources = 0
+        records_added = 0
         
         try:
             # 1. Tüm kazıcıları çalıştır
@@ -85,6 +88,7 @@ class TenderBotOrchestrator:
                 try:
                     logger.info(f"Kaynak taranıyor: {scraper.source_name}")
                     scraped_items = scraper.get_new_items()
+                    successful_sources += 1
                     
                     for item in scraped_items:
                         # Veritabanında mükerrerlik kontrolü
@@ -109,6 +113,7 @@ class TenderBotOrchestrator:
                             try:
                                 db.add(new_tender)
                                 db.commit()
+                                records_added += 1
                                 logger.info(f"Elenen ihale kaydedildi (Excluded): {item['title'][:40]}...")
                             except Exception as db_err:
                                 db.rollback()
@@ -142,6 +147,7 @@ class TenderBotOrchestrator:
                             )
                             db.add(new_tender)
                             db.commit() # Her kayıtta commit ederek veritabanı durumunu güncel tutalım
+                            records_added += 1
                             logger.info(f"İhale başarıyla kaydedildi: {item['title'][:40]}...")
                             
                             if sector:  # Sadece bir sektöre atanan ihaleleri bildirim listesine ekle
@@ -158,21 +164,43 @@ class TenderBotOrchestrator:
                             logger.error(f"İhale işlenirken veya kaydedilirken hata oluştu: {tender_err}")
                             
                 except Exception as e:
+                    failed_sources += 1
                     logger.error(f"{scraper.source_name} tarama döngüsünde hata oluştu: {e}", exc_info=True)
 
             logger.info(f"Yeni ihaleler kaydedildi. Bildirim gönderilecek ihale sayısı: {len(new_tenders_added)}")
 
             # 2. Bildirim kanallarını çalıştır (Veritabanındaki gönderilmeyen durumları toplayarak)
-            self._process_notifications(db)
+            notification_errors = self._process_notifications(db)
 
         except Exception as e:
             logger.error(f"Ana orkestrasyon döngüsünde kritik hata: {e}", exc_info=True)
+            raise e
         finally:
             db.close()
             logger.info("Tarama döngüsü tamamlandı.")
 
-    def _process_notifications(self, db: Session):
-        """Veritabanında gönderilmemiş olan ihaleleri tespit edip bildirir."""
+        # Durumu belirle
+        if successful_sources > 0 and failed_sources == 0 and notification_errors == 0:
+            status_str = "success"
+        elif successful_sources > 0 and (failed_sources > 0 or notification_errors > 0):
+            status_str = "partial"
+        elif successful_sources == 0 and failed_sources > 0:
+            status_str = "failed"
+        else:
+            status_str = "success"
+            
+        return {
+            "successful_sources": successful_sources,
+            "failed_sources": failed_sources,
+            "records_added": records_added,
+            "notification_errors": notification_errors,
+            "status": status_str
+        }
+
+    def _process_notifications(self, db: Session) -> int:
+        """Veritabanında gönderilmemiş olan ihaleleri tespit edip bildirir. Hatalı bildirim sayısını döner."""
+        notification_errors = 0
+        
         # 1. E-posta için gönderilmeyenleri bul (Sektörü 'Excluded' veya None olmayanlar)
         unsent_email = db.query(Tender).filter(
             Tender.email_sent == False,
@@ -192,9 +220,11 @@ class TenderBotOrchestrator:
                         db.commit()
                         logger.info("E-posta bildirim durumu veritabanında güncellendi.")
                     else:
+                        notification_errors += 1
                         logger.warning("E-posta bildirimi gönderilemedi (send_notification False döndü).")
                 except Exception as notify_err:
                     db.rollback()
+                    notification_errors += 1
                     logger.error(f"E-posta bildirimi gönderilirken hata oluştu: {notify_err}")
 
         # 2. Telegram için gönderilmeyenleri bul
@@ -216,10 +246,14 @@ class TenderBotOrchestrator:
                         db.commit()
                         logger.info("Telegram bildirim durumu veritabanında güncellendi.")
                     else:
+                        notification_errors += 1
                         logger.warning("Telegram bildirimi gönderilemedi (send_notification False döndü).")
                 except Exception as notify_err:
                     db.rollback()
+                    notification_errors += 1
                     logger.error(f"Telegram bildirimi gönderilirken hata oluştu: {notify_err}")
+                    
+        return notification_errors
 
     @staticmethod
     def _to_dict(tender: Tender) -> dict:

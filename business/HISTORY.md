@@ -317,3 +317,44 @@ The README accumulated product marketing, implementation detail, interface walkt
 ### Next Boundary
 
 Begin `P0.2 EKAP Public Tender Extraction` as the next focused implementation item and keep source status Experimental until fixture-based extraction tests pass.
+
+---
+
+## H-012 Ingestion Integrity and Frontend Security Guard
+
+**Date:** 2026-06-27
+
+**Key commits:**
+- `681dc97` — escape dynamic template fields and validate url protocols in dashboard UI to prevent XSS
+- `4b5b8ff` — escape template variables and restrict links in email and telegram notifiers with tests
+- `d0715b8` — security/integrity: isolate transaction boundaries and secure scheduler persistence paths with tests
+
+### Delivered
+- `escapeHtml` and scheme-sanitized `safeLink` in the SPA UI dashboard.
+- HTML escaping inside the Telegram bot and SMTP email notifier adapters.
+- decoupling of notification delivery exceptions from ingestion commits.
+- individual per-tender database transaction safety preventing single errors from rolling back entire scraping cycles.
+- Node.js validation test executing inside `pytest` suite ensuring raw XSS payloads render safely in Javascript scope.
+- tabnabbing protection utilizing `rel="noopener noreferrer"` for external anchors.
+
+### Architectural Result
+The application achieved baseline data integrity and protection against stored-XSS attacks. Scraper results are decoupled from delivery channels, ensuring robust persistence.
+
+---
+
+## H-013 Process-Safe Concurrency and CLI Consistent Daemon
+
+**Date:** 2026-06-27
+
+**Key commits:**
+- `dc1d040` — security/concurrency: implement authoritative job manager, status polling, and scan mutual exclusion with tests
+- `590d9b6` — fix/cli: import missing os module, integrate config-based check intervals, and handle Ctrl+C exit safely in daemon mode, with unit tests
+
+### Delivered
+- centralized thread-safe `JobState` tracking in FastAPI.
+- process-safe file locking `ProcessLock` coordinating CLI daemon iterations with background dashboard scanning.
+- CLI arguments (`--once`, `--daemon`, `--stats`) and interval settings fully covered by unit tests.
+- KeyboardInterrupt signal wrapping daemon sleep/run loops to guarantee clean CLI exit.
+
+### Architectural Result
+Multi-process concurrency races between FastAPI and cron/CLI processes are prevented. Config-based check interval settings are mapped with fallback rules to environment settings.

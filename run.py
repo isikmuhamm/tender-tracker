@@ -89,34 +89,32 @@ def show_stats():
         db.close()
 
 def get_check_interval() -> int:
-    """Tarama aralığını config.yaml settings.check_interval, env veya varsayılan 60 dakika olarak belirler."""
+    """Tarama aralığını belirler. Öncelik sırası: ENV > config.yaml settings.check_interval_minutes > settings.check_interval > Varsayılan (60 dk)."""
     import yaml
-    interval = None
     
-    # 1. config.yaml settings.check_interval okumayı dene
+    # 1. ENV kontrolü (En yüksek öncelik)
+    env_val = os.getenv("CHECK_INTERVAL_MINUTES")
+    if env_val:
+        try:
+            return int(env_val)
+        except ValueError:
+            pass
+            
+    # 2. config.yaml kontrolü
     config_path = get_data_path("config.yaml")
     if os.path.exists(config_path):
         try:
             with open(config_path, "r", encoding="utf-8") as f:
                 config = yaml.safe_load(f) or {}
-                interval = config.get("settings", {}).get("check_interval")
+                settings = config.get("settings", {})
+                interval = settings.get("check_interval_minutes", settings.get("check_interval"))
+                if interval is not None:
+                    return int(interval)
         except Exception:
             pass
             
-    # 2. CHECK_INTERVAL_MINUTES env okumayı dene
-    if interval is None:
-        try:
-            env_val = os.getenv("CHECK_INTERVAL_MINUTES")
-            if env_val:
-                interval = int(env_val)
-        except Exception:
-            pass
-            
-    # 3. Varsayılan değer
-    if interval is None:
-        interval = 60
-        
-    return int(interval)
+    # 3. Varsayılan
+    return 60
 
 def main():
     args = parse_arguments()
@@ -135,7 +133,15 @@ def main():
         logger.info("=" * 60)
         logger.info("İHALE TAKİP BOTU - TEK SEFERLİK ÇALIŞTIRMA MODU")
         logger.info("=" * 60)
-        orchestrator.run_once()
+        from src.process_lock import ProcessLock
+        lock = ProcessLock("scan")
+        if not lock.acquire():
+            logger.error("Hata: Başka bir tarama veya re-evaluation işlemi (örneğin Dashboard) çalışıyor. Çıkılıyor.")
+            sys.exit(1)
+        try:
+            orchestrator.run_once()
+        finally:
+            lock.release()
         return
 
     if args.daemon:
@@ -147,12 +153,20 @@ def main():
         interval_minutes = get_check_interval()
         logger.info(f"Bot başlatıldı. Tarama sıklığı: {interval_minutes} dakika.")
         
+        from src.process_lock import ProcessLock
+        lock = ProcessLock("scan")
+        
         try:
             while True:
-                try:
-                    orchestrator.run_once()
-                except Exception as e:
-                    logger.error(f"Daemon döngüsünde beklenmeyen hata: {e}")
+                if lock.acquire():
+                    try:
+                        orchestrator.run_once()
+                    except Exception as e:
+                        logger.error(f"Daemon döngüsünde beklenmeyen hata: {e}")
+                    finally:
+                        lock.release()
+                else:
+                    logger.warning("Beklemede: Başka bir tarama veya re-evaluation işlemi çalışıyor. Sonraki döngüde tekrar denenecek.")
                 
                 logger.info(f"Bekleme moduna geçiliyor. Sonraki tarama {interval_minutes} dakika sonra.")
                 time.sleep(interval_minutes * 60)

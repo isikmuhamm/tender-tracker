@@ -21,8 +21,9 @@ class JobState:
         self.lock = Lock()
         self.status = "idle"  # "idle", "scanning", "re_evaluating"
         self.last_run_time = None
-        self.last_run_status = "idle"  # "idle", "success", "failed"
+        self.last_run_status = "idle"  # "idle", "success", "failed", "partial"
         self.error_message = None
+        self.last_result = None
 
     def start_job(self, job_type: str) -> bool:
         with self.lock:
@@ -30,14 +31,19 @@ class JobState:
                 return False
             self.status = job_type
             self.error_message = None
+            self.last_result = None
             return True
 
-    def finish_job(self, success: bool, error_msg: str = None):
+    def finish_job(self, success: bool, error_msg: str = None, result: dict = None):
         with self.lock:
             self.status = "idle"
             self.last_run_time = datetime.datetime.now().isoformat()
-            self.last_run_status = "success" if success else "failed"
+            if result:
+                self.last_run_status = result.get("status", "success")
+            else:
+                self.last_run_status = "success" if success else "failed"
             self.error_message = error_msg
+            self.last_result = result
 
 job_state = JobState()
 
@@ -223,26 +229,39 @@ def get_job_status(current_user: User = Depends(get_current_user)):
         "status": job_state.status,
         "last_run_time": job_state.last_run_time,
         "last_run_status": job_state.last_run_status,
-        "error_message": job_state.error_message
+        "error_message": job_state.error_message,
+        "result": job_state.last_result
     }
 
 @app.post("/api/tenders/trigger")
 def trigger_scraper(current_user: User = Depends(get_current_user)):
     """Tarayıcı botunu arka planda tek seferlik tetikler."""
+    from src.process_lock import ProcessLock
+    
     if not job_state.start_job("scanning"):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Sistem zaten meşgul: Arka planda {job_state.status} işlemi çalışıyor."
         )
         
+    lock = ProcessLock("scan")
+    if not lock.acquire():
+        job_state.finish_job(False, "Başka bir tarama işlemi (CLI daemon veya eşzamanlı istek) çalışıyor.")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Sistem zaten meşgul: Arka planda CLI daemon veya başka bir tarama çalışıyor."
+        )
+        
     def run_scraper_bg():
         try:
             orch = TenderBotOrchestrator()
-            orch.run_once()
-            job_state.finish_job(True)
+            result = orch.run_once()
+            job_state.finish_job(True, result=result)
         except Exception as e:
             logger.error(f"Arka plan tarama hatası: {e}", exc_info=True)
             job_state.finish_job(False, str(e))
+        finally:
+            lock.release()
             
     threading.Thread(target=run_scraper_bg).start()
     return {"success": True, "message": "Tarama işlemi arka planda başlatıldı."}
@@ -250,10 +269,20 @@ def trigger_scraper(current_user: User = Depends(get_current_user)):
 @app.post("/api/tenders/re-evaluate")
 def re_evaluate_tenders(current_user: User = Depends(get_current_user)):
     """Veritabanındaki mevcut ihaleleri yeni süzgeç kurallarına göre arka planda yeniden değerlendirir."""
+    from src.process_lock import ProcessLock
+    
     if not job_state.start_job("re_evaluating"):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Sistem zaten meşgul: Arka planda {job_state.status} işlemi çalışıyor."
+        )
+        
+    lock = ProcessLock("scan")
+    if not lock.acquire():
+        job_state.finish_job(False, "Başka bir tarama işlemi (CLI daemon veya eşzamanlı istek) çalışıyor.")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Sistem zaten meşgul: Arka planda CLI daemon veya başka bir tarama çalışıyor."
         )
         
     def run_re_evaluation_bg():
@@ -281,7 +310,7 @@ def re_evaluate_tenders(current_user: User = Depends(get_current_user)):
                 for t in tenders:
                     t.matched_custom_filters = None
                 db_session.commit()
-                job_state.finish_job(True)
+                job_state.finish_job(True, result={"status": "success", "records_added": 0})
                 return
                 
             # 3. Veritabanından elenmemiş ihaleleri çek
@@ -299,12 +328,13 @@ def re_evaluate_tenders(current_user: User = Depends(get_current_user)):
                 db_session.commit()
                 
             logger.info("İhalelerin akıllı süzgeç değerlendirmeleri başarıyla güncellendi.")
-            job_state.finish_job(True)
+            job_state.finish_job(True, result={"status": "success", "records_added": len(tenders)})
         except Exception as e:
             logger.error(f"İhaleler yeniden değerlendirilirken hata: {e}")
             job_state.finish_job(False, str(e))
         finally:
             db_session.close()
+            lock.release()
             
     threading.Thread(target=run_re_evaluation_bg).start()
     return {"success": True, "message": "Yeniden değerlendirme işlemi arka planda başlatıldı."}
@@ -404,8 +434,8 @@ def get_models(
         
     try:
         if provider == "gemini":
-            url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
-            res = requests.get(url, timeout=5)
+            url = "https://generativelanguage.googleapis.com/v1beta/models"
+            res = requests.get(url, headers={"x-goog-api-key": api_key}, timeout=5)
             if res.status_code == 200:
                 data = res.json()
                 models = [m["name"].split("/")[-1] for m in data.get("models", []) if "generateContent" in m.get("supportedGenerationMethods", [])]
@@ -441,7 +471,10 @@ def get_models(
                 if models:
                     return {"models": models}
     except Exception as e:
-        logging.error(f"Modeller çekilirken hata: {e}")
+        err_msg = str(e)
+        if api_key:
+            err_msg = err_msg.replace(api_key, "HIDDEN_KEY")
+        logging.error(f"Modeller çekilirken hata: {err_msg}")
         
     return {"models": defaults.get(provider, [])}
 

@@ -555,7 +555,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         <span><i class="fa-solid fa-calendar-days"></i> ${escapeHtml(formattedDate)}</span>
                         ${t.category ? `<span><i class="fa-solid fa-bookmark"></i> ${escapeHtml(t.category)}</span>` : ""}
                     </div>
-                    <a href="${escapeHtml(safeLink(t.link))}" target="_blank" class="btn-link">Detay <i class="fa-solid fa-arrow-up-right-from-square"></i></a>
+                    <a href="${escapeHtml(safeLink(t.link))}" target="_blank" rel="noopener noreferrer" class="btn-link">Detay <i class="fa-solid fa-arrow-up-right-from-square"></i></a>
                 </div>
             `;
             tendersGrid.appendChild(card);

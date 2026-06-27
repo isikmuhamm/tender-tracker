@@ -344,14 +344,17 @@ Open `http://127.0.0.1:8000` if the browser does not open automatically.
 ### Command-Line Utilities
 
 ```bash
-# Run one ingestion cycle and exit
+# Run one ingestion cycle and exit (default when run without arguments)
 python run.py --once
+
+# Run continuously as a background daemon polling at regular intervals
+python run.py --daemon
 
 # Display local database statistics
 python run.py --stats
 ```
 
-The dashboard and CLI are separate entry paths. Interval-based daemon execution exists as an engineering path but should not be presented as a packaged desktop guarantee until its lifecycle and release behavior are verified. Read the current board before changing scheduler or packaging behavior.
+The dashboard (via `python app.py`) and CLI (via `python run.py`) are separate entry paths. Interval-based daemon execution exists as a CLI execution mode. Read the current board before changing scheduler or packaging behavior.
 
 ### Build The Windows Executable
 
