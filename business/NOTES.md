@@ -195,7 +195,7 @@ Definition of done:
 - isolated failure behavior;
 - README status updated only after verification.
 
-**Status:** Open; highest-priority source work.
+**Status:** Completed.
 
 ---
 

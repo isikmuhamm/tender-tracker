@@ -129,7 +129,7 @@ def test_status_scenarios(mock_init, mock_session_class, mock_db_setup, tmp_path
     # 6. Scenario: EKAP metadata state handling (initial vs incremental sync updates)
     from src.database import SystemState
     # Clean system state first
-    session.query(SystemState).filter_by(key="last_success_at_ekapv2").delete()
+    session.query(SystemState).filter_by(key="last_success_at:ekapv2").delete()
     session.commit()
 
     scraper_ekap = MagicMock()
@@ -146,7 +146,7 @@ def test_status_scenarios(mock_init, mock_session_class, mock_db_setup, tmp_path
     
     # Check that database now has the state updated
     session.expire_all()
-    state_after = session.query(SystemState).filter_by(key="last_success_at_ekapv2").first()
+    state_after = session.query(SystemState).filter_by(key="last_success_at:ekapv2").first()
     assert state_after is not None
     last_success_val = state_after.value
     assert last_success_val is not None
@@ -158,7 +158,7 @@ def test_status_scenarios(mock_init, mock_session_class, mock_db_setup, tmp_path
 
     # Capture the updated value after result7 succeeds
     session.expire_all()
-    updated_success_val = session.query(SystemState).filter_by(key="last_success_at_ekapv2").first().value
+    updated_success_val = session.query(SystemState).filter_by(key="last_success_at:ekapv2").first().value
 
     # Fail run: should not advance/change the success date
     scraper_ekap.get_new_items.side_effect = Exception("Fetch failed on page 2")
@@ -166,5 +166,5 @@ def test_status_scenarios(mock_init, mock_session_class, mock_db_setup, tmp_path
     
     # Value must remain unchanged
     session.expire_all()
-    state_after_fail = session.query(SystemState).filter_by(key="last_success_at_ekapv2").first()
+    state_after_fail = session.query(SystemState).filter_by(key="last_success_at:ekapv2").first()
     assert state_after_fail.value == updated_success_val

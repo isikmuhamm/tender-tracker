@@ -62,13 +62,7 @@ class YatirimlarScraper(BaseScraper):
                     "source": self.source_name
                 })
                 
-            # Çift kayıtları (aynı linki) kaldır
-            unique_items = {}
-            for item in items:
-                unique_items[item["link"]] = item
-                
-            result = list(unique_items.values())
-            logger.info(f"Yatırımlar Dergisi ayrıştırıldı. Toplam {len(result)} benzersiz haber bulundu.")
-            return result
+            logger.info(f"Yatırımlar Dergisi ayrıştırıldı. Toplam {len(items)} haber bulundu.")
+            return items
         except Exception as e:
             raise SourceParseError(f"Yatırımlar Dergisi veri ayrıştırma hatası: {e}")

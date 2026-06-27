@@ -395,3 +395,26 @@ The EKAP v2 public tender search is fully integrated as an operational, secure, 
 
 ### Architectural Result
 Incremental and initial synchronization behavior for EKAP is robustly tied to local state persistence, ensuring stable execution paths over restarts and failures.
+
+---
+
+## H-016 Scraper Standardization And Safe Watermark Ingestion
+
+**Date:** 2026-06-27
+
+### Delivered
+- **Centralized Output Contract:** Implemented a unified `normalize_and_validate` method inside `BaseScraper` to guarantee that all crawler outputs contain exactly 5 standard fields (`link`, `title`, `summary`, `category`, `source`).
+- **Whitespace & Duplicate Control:** Automatically trims whitespace, validates link schemas (forcing HTTP/HTTPS protocols), and deduplicates records within a single response before returning.
+- **Source Field Protection:** Always overwrites the returned `source` field with the scraper's own `self.source_name`.
+- **SourceParseError Trigger:** Raises `SourceParseError` if a non-empty parsed response yields zero valid normalized records (preventing silent parser degradation).
+- **ilan.gov.tr Pagination & Cycle Checks:** Standardized `ilan_gov_tr` paging logic to loop through `skipCount` (30 records per page, up to 100 pages), terminating on `totalCount` or short pages, with cycle detection preventing infinite loops and raising `SourceFetchError` if safety limits are reached with missing records.
+- **EKAP Safety Page Limits:** Enforced identical page limit checks in `Ekapv2Scraper`, raising `SourceFetchError` on safety limit boundaries.
+- **Generic SystemState Helpers:** Added generic `get_last_success_at` and `set_last_success_at` helper functions in `database.py` with keys mapped as `last_success_at:{source_name}`.
+- **Chunked SQLite Deduplication:** Deduplicates incoming links against the database in safe chunks of 500 records to prevent hitting SQLite parameter limits.
+- **Safe Watermark Updates:** Updates the source watermark timestamp (`last_success_at`) only at the end of the scraper's loop if fetch, parse, classification, and database persistence complete without any processing errors.
+- **Distributed Unit Tests:** Added 10 new tests distributed across `test_base_scraper.py`, `test_ilan_gov_tr.py`, `test_ekapv2.py`, and `test_scheduler_status.py`, verifying the standardized contract, cycle checks, and watermark states. All 71 tests passing successfully.
+- **Windows Executable Smokes:** Compiled `dist/tender-tracker.exe` using `build.py` and validated startup behavior using `smoke_check_exe.py` successfully.
+
+### Architectural Result
+Scrapers now share a single strict normalization and contract safety layer, making it impossible to store malformed records. Watermark progress is strictly tied to successful database commits, making ingestion completely transactional.
+

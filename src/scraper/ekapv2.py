@@ -77,7 +77,6 @@ class Ekapv2Scraper(BaseScraper):
     def fetch(self) -> str:
         logger.info(f"EKAPv2 ihaleleri çekiliyor: {self.url}")
         
-        # 1. Güvenli olmayan TLS fallback ayarını kontrol et (ENV > config.yaml > default)
         insecure_fallback = os.getenv("EKAP_INSECURE_FALLBACK", "false").lower() in ("true", "1", "yes")
         if not insecure_fallback:
             from src.database import get_data_path
@@ -91,7 +90,6 @@ class Ekapv2Scraper(BaseScraper):
                 except Exception:
                     pass
 
-        # Tarih filtresi belirle (last_success_at var ise o tarihten sonrakiler, yoksa teklif vermeye açık tüm ihaleler)
         date_start = None
         if self.last_success_at:
             date_start = self.last_success_at.strftime("%d.%m.%Y")
@@ -104,7 +102,6 @@ class Ekapv2Scraper(BaseScraper):
         take = 40
         max_pages = 500
         
-        # 2. TLS Adapter kurulumunu gerçekleştir (varsayılan olarak sertifika doğrulaması açıktır)
         def make_session(verify_secure=True):
             s = requests.Session()
             s.headers.update(self.headers)
@@ -182,12 +179,10 @@ class Ekapv2Scraper(BaseScraper):
             }
             
             try:
-                # 3. İsteği gönder
                 r = session.post(self.url, json=api_params, timeout=30)
                 r.raise_for_status()
                 data = r.json()
             except requests.exceptions.SSLError as ssl_err:
-                # SSL Hatası durumunda, fallback ayarı açıksa güvensiz moda geçerek tekrar dene
                 if insecure_fallback and not is_fallback_active:
                     logger.warning("EKAPv2 standard SSL verification failed. Falling back to insecure compatibility mode as configured.")
                     is_fallback_active = True
@@ -204,10 +199,8 @@ class Ekapv2Scraper(BaseScraper):
                 else:
                     raise SourceFetchError(f"EKAPv2 SSL verification failed (Sayfa {page}): {ssl_err}. Fallback is disabled.")
             except Exception as e:
-                # Diğer HTTP/bağlantı hatalarında (sayfa fark etmeksizin) hatayı fırlat
                 raise SourceFetchError(f"EKAPv2 API bağlantı hatası (Sayfa {page}): {e}")
             
-            # 4. Şema Doğrulaması (Schema Validation)
             if not isinstance(data, dict):
                 raise SourceFetchError(f"EKAPv2 API yanıtı sözlük nesnesi değil (Sayfa {page})")
             if "list" not in data or not isinstance(data["list"], list):
@@ -230,7 +223,10 @@ class Ekapv2Scraper(BaseScraper):
                 break
                 
             page += 1
-            # Sunucuyu yormamak için kısa bekleme süresi
+            if page >= max_pages:
+                if total_count > 0 and len(all_tenders) < total_count:
+                    raise SourceFetchError("EKAPv2 sayfalama güvenlik sınırına (500 sayfa) ulaşıldı fakat tüm kayıtlar çekilemedi.")
+                break
             time.sleep(0.5)
             
         logger.info(f"EKAPv2 API taraması bitti. Toplam çekilen: {len(all_tenders)}, Toplam sunucudaki: {total_count}")
@@ -292,9 +288,6 @@ class Ekapv2Scraper(BaseScraper):
                     "category": category,
                     "source": self.source_name
                 })
-                
-            if tenders and not items:
-                raise SourceParseError("Gelen tüm EKAP kayıtları eksik zorunlu alanlar (ikn/title) yüzünden elendi.")
                 
             logger.info(f"EKAPv2 İhaleleri ayrıştırıldı. Toplam {len(items)} ihale bulundu.")
             return items

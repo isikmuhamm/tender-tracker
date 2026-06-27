@@ -67,13 +67,7 @@ class DmoScraper(BaseScraper):
                     "source": self.source_name
                 })
                 
-            # Çift kayıtları (aynı linki) kaldır
-            unique_items = {}
-            for item in items:
-                unique_items[item["link"]] = item
-                
-            result = list(unique_items.values())
-            logger.info(f"DMO İhaleleri ayrıştırıldı. Toplam {len(result)} benzersiz ihale bulundu.")
-            return result
+            logger.info(f"DMO İhaleleri ayrıştırıldı. Toplam {len(items)} ihale bulundu.")
+            return items
         except Exception as e:
             raise SourceParseError(f"DMO İhale Listesi veri ayrıştırma hatası: {e}")

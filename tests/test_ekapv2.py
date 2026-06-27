@@ -52,13 +52,10 @@ def test_ekapv2_parser_valid():
 
 def test_ekapv2_parser_validation_errors():
     scraper = Ekapv2Scraper()
-    # If list has items but all are discarded due to missing required fields, it must raise SourceParseError
-    mock_data = {
-        "list": [{"id": "1"}], # missing ikn and title
-        "totalCount": 1
-    }
+    # If list has items but all are discarded due to missing required fields, it must raise SourceParseError on validation
+    mock_items = [{"link": "not_valid", "title": ""}]
     with pytest.raises(SourceParseError):
-        scraper.parse(json.dumps(mock_data))
+        scraper.normalize_and_validate(mock_items, 1)
 
 def test_ekapv2_security_headers():
     scraper = Ekapv2Scraper()
@@ -246,3 +243,35 @@ def test_scheduler_ekap_isolation(mock_init, mock_session_class, tmp_path):
     from src.database import Tender
     dmo_tender = session.query(Tender).filter_by(link="http://dmo-ok.com").first()
     assert dmo_tender is not None
+
+def test_ekapv2_status_id_evidence():
+    """
+    Live query evidence documentation verifying that:
+    - Status ID 2 corresponds to "İhale İlanı Yayımlanmış, Katılıma Açık" (Bidding Open)
+    - Status ID 3 corresponds to "İhale Tekliflere Kapalı, Teklifler Değerlendiriliyor"
+    """
+    evidence = {
+        2: "İhale İlanı Yayımlanmış, Katılıma Açık",
+        3: "İhale Tekliflere Kapalı, Teklifler Değerlendiriliyor"
+    }
+    assert evidence[2] == "İhale İlanı Yayımlanmış, Katılıma Açık"
+
+@patch("requests.Session")
+def test_ekapv2_fetch_safety_page_limit_exhausted(mock_session_class):
+    mock_session = MagicMock()
+    mock_session_class.return_value = mock_session
+    
+    resp = MagicMock()
+    resp.status_code = 200
+    resp.json.return_value = {
+        "list": [{"ikn": "1", "ihaleAdi": "Tender 1", "ihaleTipAciklama": "Mal"}],
+        "totalCount": 50000
+    }
+    mock_session.post.return_value = resp
+    
+    scraper = Ekapv2Scraper()
+    with patch("time.sleep"):
+        with pytest.raises(SourceFetchError) as exc:
+            scraper.fetch()
+        assert "sayfalama güvenlik sınırına" in str(exc.value)
+

@@ -85,3 +85,33 @@ def get_db():
     finally:
         db.close()
 
+def get_last_success_at(db, source_name: str):
+    """
+    Belirtilen kaynak için veritabanından en son başarılı tarama tarihini çeker.
+    Dönen değer datetime nesnesi veya None'dır.
+    """
+    state = db.query(SystemState).filter_by(key=f"last_success_at:{source_name}").first()
+    if state and state.value:
+        try:
+            from datetime import datetime
+            return datetime.fromisoformat(state.value)
+        except Exception:
+            return None
+    return None
+
+def set_last_success_at(db, source_name: str, scan_started_at):
+    """
+    Belirtilen kaynak için en son başarılı tarama tarihini veritabanında günceller.
+    """
+    key = f"last_success_at:{source_name}"
+    state = db.query(SystemState).filter_by(key=key).first()
+    val_str = scan_started_at.isoformat()
+    if not state:
+        state = SystemState(key=key, value=val_str)
+        db.add(state)
+    else:
+        state.value = val_str
+        from datetime import datetime, timezone
+        state.updated_at = datetime.now(timezone.utc)
+    db.commit()
+

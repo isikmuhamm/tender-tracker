@@ -89,36 +89,30 @@ class TenderBotOrchestrator:
                 try:
                     logger.info(f"Kaynak taranıyor: {scraper.source_name}")
                     
-                    if scraper.source_name == "ekapv2":
-                        from datetime import datetime
-                        state_val = db.query(SystemState).filter_by(key="last_success_at_ekapv2").first()
-                        if state_val and state_val.value:
-                            try:
-                                scraper.last_success_at = datetime.fromisoformat(state_val.value)
-                            except Exception:
-                                scraper.last_success_at = None
-                        else:
-                            scraper.last_success_at = None
-                            
+                    from src.database import get_last_success_at
+                    scraper.last_success_at = get_last_success_at(db, scraper.source_name)
+                    
+                    from datetime import datetime, timezone
+                    source_scan_started_at = datetime.now(timezone.utc)
                     scraped_items = scraper.get_new_items()
                     successful_sources += 1
                     
-                    if scraper.source_name == "ekapv2":
-                        from datetime import datetime, timezone
-                        now_iso = datetime.now(timezone.utc).isoformat()
-                        state_val = db.query(SystemState).filter_by(key="last_success_at_ekapv2").first()
-                        if not state_val:
-                            state_val = SystemState(key="last_success_at_ekapv2", value=now_iso)
-                            db.add(state_val)
-                        else:
-                            state_val.value = now_iso
-                            state_val.updated_at = datetime.now(timezone.utc)
-                        db.commit()
+                    # Veritabanı mükerrerlik kontrolü (SQLite uyumlu chunked batch dedupe)
+                    incoming_links = {item["link"] for item in scraped_items}
+                    existing_links = set()
+                    if incoming_links:
+                        incoming_list = list(incoming_links)
+                        chunk_size = 500
+                        for i in range(0, len(incoming_list), chunk_size):
+                            chunk = incoming_list[i : i + chunk_size]
+                            rows = db.query(Tender.link).filter(Tender.link.in_(chunk)).all()
+                            for r in rows:
+                                existing_links.add(r[0])
+                    
+                    start_processing_errors = processing_errors
                     
                     for item in scraped_items:
-                        # Veritabanında mükerrerlik kontrolü
-                        exists = db.query(Tender).filter_by(link=item["link"]).first()
-                        if exists:
+                        if item["link"] in existing_links:
                             continue
                             
                         # Küresel filtre kontrolü (kiralık/satılık vb.)
@@ -190,6 +184,11 @@ class TenderBotOrchestrator:
                             processing_errors += 1
                             logger.error(f"İhale işlenirken veya kaydedilirken hata oluştu: {tender_err}")
                             
+                    # Eğer bu kaynak için hiç işlem hatası (processing_errors) oluşmadıysa watermark zamanını kaydet
+                    if processing_errors == start_processing_errors:
+                        from src.database import set_last_success_at
+                        set_last_success_at(db, scraper.source_name, source_scan_started_at)
+                        
                 except Exception as e:
                     failed_sources += 1
                     logger.error(f"{scraper.source_name} tarama döngüsünde hata oluştu: {e}", exc_info=True)
