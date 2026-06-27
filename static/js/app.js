@@ -940,13 +940,18 @@ document.addEventListener("DOMContentLoaded", () => {
         
         const response = await apiRequest("/api/tenders/re-evaluate", { method: "POST" });
         if (response && response.ok) {
-            showToast("Yeniden değerlendirme arka planda başlatıldı. Tamamlandığında ihaleler güncellenecektir.");
+            showToast("Yeniden değerlendirme arka planda başlatıldı.");
+            updateJobStatusUI();
         } else {
-            showToast("Yeniden değerlendirme başlatılamadı!");
+            btnReevaluateFilters.disabled = false;
+            btnReevaluateFilters.innerHTML = originalText;
+            if (response && response.status === 409) {
+                const data = await response.json();
+                showToast(data.detail || "Sistem meşgul!");
+            } else {
+                showToast("Yeniden değerlendirme başlatılamadı!");
+            }
         }
-        
-        btnReevaluateFilters.disabled = false;
-        btnReevaluateFilters.innerHTML = originalText;
     });
 
     // --- Sectors Accordion Sub-Module ---
@@ -1339,6 +1344,87 @@ document.addEventListener("DOMContentLoaded", () => {
     btnRefreshLogs.addEventListener("click", loadLogs);
 
     // =========================================================
+    // JOB STATUS POLLING
+    // =========================================================
+    let jobPollingInterval = null;
+    let isJobRunning = false;
+
+    async function updateJobStatusUI() {
+        if (!loginContainer.classList.contains("d-none")) {
+            const token = localStorage.getItem("token");
+            if (!token) return;
+        }
+        
+        const response = await apiRequest("/api/job/status");
+        if (!response || !response.ok) return;
+        
+        const data = await response.json();
+        const status = data.status; // "idle", "scanning", "re_evaluating"
+        
+        if (status === "scanning") {
+            isJobRunning = true;
+            btnTrigger.disabled = true;
+            syncIcon.classList.add("spin");
+            btnTrigger.title = "Tarama yapılıyor...";
+        } else {
+            if (status !== "re_evaluating") {
+                if (isJobRunning && !btnTrigger.disabled) {
+                    // Do nothing if it's already reset
+                } else if (isJobRunning || syncIcon.classList.contains("spin")) {
+                    isJobRunning = false;
+                    syncIcon.classList.remove("spin");
+                    btnTrigger.disabled = false;
+                    btnTrigger.title = "Botu Şimdi Çalıştır";
+                    if (activePanel === "panel-tenders") loadTenders();
+                    if (activePanel === "panel-logs") loadLogs();
+                    
+                    if (data.last_run_status === "failed") {
+                        showToast(`Tarama başarısız oldu: ${data.error_message || "Bilinmeyen hata"}`);
+                    } else if (data.last_run_status === "success") {
+                        showToast("Tarama tamamlandı, ihaleler güncellendi.");
+                    }
+                }
+            }
+        }
+        
+        if (status === "re_evaluating") {
+            isJobRunning = true;
+            btnReevaluateFilters.disabled = true;
+            btnReevaluateFilters.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Yeniden Değerlendiriliyor...';
+        } else {
+            if (status !== "scanning") {
+                const isReevalBtnActive = btnReevaluateFilters.innerHTML.includes("Yeniden Değerlendiriliyor");
+                if (isJobRunning && !btnReevaluateFilters.disabled) {
+                    // Do nothing
+                } else if (isJobRunning || isReevalBtnActive) {
+                    isJobRunning = false;
+                    btnReevaluateFilters.disabled = false;
+                    btnReevaluateFilters.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Süzgeçleri Yeniden Çalıştır';
+                    if (activePanel === "panel-tenders") loadTenders();
+                    if (activePanel === "panel-logs") loadLogs();
+                    
+                    if (data.last_run_status === "failed") {
+                        showToast(`Yeniden değerlendirme başarısız oldu: ${data.error_message || "Bilinmeyen hata"}`);
+                    } else if (data.last_run_status === "success") {
+                        showToast("Yeniden değerlendirme tamamlandı, süzgeçler güncellendi.");
+                    }
+                }
+            }
+        }
+        
+        if (status !== "idle") {
+            if (!jobPollingInterval) {
+                jobPollingInterval = setInterval(updateJobStatusUI, 2000);
+            }
+        } else {
+            if (jobPollingInterval) {
+                clearInterval(jobPollingInterval);
+                jobPollingInterval = null;
+            }
+        }
+    }
+
+    // =========================================================
     // TRIGGER BOT ACTION
     // =========================================================
     btnTrigger.addEventListener("click", async () => {
@@ -1350,16 +1436,17 @@ document.addEventListener("DOMContentLoaded", () => {
         });
         
         if (response && response.ok) {
-            showToast("Tarama botu arka planda tetiklendi.");
-            setTimeout(() => {
-                syncIcon.classList.remove("spin");
-                btnTrigger.disabled = false;
-                if (activePanel === "panel-tenders") loadTenders();
-                if (activePanel === "panel-logs") loadLogs();
-            }, 3000);
+            showToast("Tarama botu arka planda başlatıldı.");
+            updateJobStatusUI();
         } else {
             syncIcon.classList.remove("spin");
             btnTrigger.disabled = false;
+            if (response && response.status === 409) {
+                const data = await response.json();
+                showToast(data.detail || "Sistem meşgul!");
+            } else {
+                showToast("Tarama başlatılamadı!");
+            }
         }
     });
 
@@ -1422,6 +1509,7 @@ document.addEventListener("DOMContentLoaded", () => {
         
         // Start background checks
         checkStatusUpdates();
+        updateJobStatusUI();
         setInterval(checkStatusUpdates, 20000);
     }
 

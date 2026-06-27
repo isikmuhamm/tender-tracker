@@ -13,6 +13,33 @@ from sqlalchemy.orm import Session
 from src.database import init_db, get_db, Tender, User, get_data_path
 from src.auth import verify_password, create_access_token, get_current_user
 from src.scheduler import TenderBotOrchestrator
+import datetime
+from threading import Lock
+
+class JobState:
+    def __init__(self):
+        self.lock = Lock()
+        self.status = "idle"  # "idle", "scanning", "re_evaluating"
+        self.last_run_time = None
+        self.last_run_status = "idle"  # "idle", "success", "failed"
+        self.error_message = None
+
+    def start_job(self, job_type: str) -> bool:
+        with self.lock:
+            if self.status != "idle":
+                return False
+            self.status = job_type
+            self.error_message = None
+            return True
+
+    def finish_job(self, success: bool, error_msg: str = None):
+        with self.lock:
+            self.status = "idle"
+            self.last_run_time = datetime.datetime.now().isoformat()
+            self.last_run_status = "success" if success else "failed"
+            self.error_message = error_msg
+
+job_state = JobState()
 
 # Global logging yapılandırması
 logger = logging.getLogger()
@@ -189,15 +216,33 @@ def get_tenders(
         ]
     }
 
+@app.get("/api/job/status")
+def get_job_status(current_user: User = Depends(get_current_user)):
+    """Arka planda çalışan tarama veya yeniden değerlendirme işlemlerinin durumunu döner."""
+    return {
+        "status": job_state.status,
+        "last_run_time": job_state.last_run_time,
+        "last_run_status": job_state.last_run_status,
+        "error_message": job_state.error_message
+    }
+
 @app.post("/api/tenders/trigger")
 def trigger_scraper(current_user: User = Depends(get_current_user)):
     """Tarayıcı botunu arka planda tek seferlik tetikler."""
+    if not job_state.start_job("scanning"):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Sistem zaten meşgul: Arka planda {job_state.status} işlemi çalışıyor."
+        )
+        
     def run_scraper_bg():
         try:
             orch = TenderBotOrchestrator()
             orch.run_once()
+            job_state.finish_job(True)
         except Exception as e:
-            print(f"Arka plan tarama hatası: {e}")
+            logger.error(f"Arka plan tarama hatası: {e}", exc_info=True)
+            job_state.finish_job(False, str(e))
             
     threading.Thread(target=run_scraper_bg).start()
     return {"success": True, "message": "Tarama işlemi arka planda başlatıldı."}
@@ -205,6 +250,12 @@ def trigger_scraper(current_user: User = Depends(get_current_user)):
 @app.post("/api/tenders/re-evaluate")
 def re_evaluate_tenders(current_user: User = Depends(get_current_user)):
     """Veritabanındaki mevcut ihaleleri yeni süzgeç kurallarına göre arka planda yeniden değerlendirir."""
+    if not job_state.start_job("re_evaluating"):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Sistem zaten meşgul: Arka planda {job_state.status} işlemi çalışıyor."
+        )
+        
     def run_re_evaluation_bg():
         from src.database import SessionLocal
         from src.classifier import TenderClassifier
@@ -214,8 +265,7 @@ def re_evaluate_tenders(current_user: User = Depends(get_current_user)):
             # 1. Config'i yükle
             config_path = get_data_path("config.yaml")
             if not os.path.exists(config_path):
-                logger.error("Yeniden değerlendirme hatası: config.yaml bulunamadı.")
-                return
+                raise ValueError("config.yaml bulunamadı.")
             with open(config_path, "r", encoding="utf-8") as f:
                 config_data = yaml.safe_load(f) or {}
                 
@@ -231,6 +281,7 @@ def re_evaluate_tenders(current_user: User = Depends(get_current_user)):
                 for t in tenders:
                     t.matched_custom_filters = None
                 db_session.commit()
+                job_state.finish_job(True)
                 return
                 
             # 3. Veritabanından elenmemiş ihaleleri çek
@@ -248,8 +299,10 @@ def re_evaluate_tenders(current_user: User = Depends(get_current_user)):
                 db_session.commit()
                 
             logger.info("İhalelerin akıllı süzgeç değerlendirmeleri başarıyla güncellendi.")
+            job_state.finish_job(True)
         except Exception as e:
             logger.error(f"İhaleler yeniden değerlendirilirken hata: {e}")
+            job_state.finish_job(False, str(e))
         finally:
             db_session.close()
             

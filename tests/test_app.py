@@ -218,3 +218,33 @@ def test_get_models_with_header_key(client):
     data = response.json()
     assert "models" in data
 
+def test_job_status_and_mutual_exclusion(client):
+    login_resp = client.post(
+        "/api/auth/login",
+        data={"username": "admin", "password": "admin"}
+    )
+    token = login_resp.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    
+    status_resp = client.get("/api/job/status", headers=headers)
+    assert status_resp.status_code == 200
+    assert status_resp.json()["status"] == "idle"
+    
+    from app import job_state
+    assert job_state.start_job("scanning") is True
+    
+    trigger_resp = client.post("/api/tenders/trigger", headers=headers)
+    assert trigger_resp.status_code == 409
+    assert "meşgul" in trigger_resp.json()["detail"]
+    
+    reeval_resp = client.post("/api/tenders/re-evaluate", headers=headers)
+    assert reeval_resp.status_code == 409
+    
+    status_resp = client.get("/api/job/status", headers=headers)
+    assert status_resp.json()["status"] == "scanning"
+    
+    job_state.finish_job(True)
+    status_resp = client.get("/api/job/status", headers=headers)
+    assert status_resp.json()["status"] == "idle"
+    assert status_resp.json()["last_run_status"] == "success"
+
