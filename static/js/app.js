@@ -294,6 +294,19 @@ document.addEventListener("DOMContentLoaded", () => {
         checkAuth();
     });
 
+    // Enter key form submit helper for login and setup forms
+    [loginForm, setupForm].forEach(form => {
+        if (!form) return;
+        form.querySelectorAll("input").forEach(input => {
+            input.addEventListener("keydown", (e) => {
+                if (e.key === "Enter") {
+                    e.preventDefault();
+                    form.requestSubmit();
+                }
+            });
+        });
+    });
+
     function handleAuthError() {
         removeToken();
         checkAuth();

@@ -18,9 +18,18 @@ Raylı Sistemler ve Metro:
     - "vagon"
     - "travers"
     - "lokomotif"
+    - "balast"
+    - "demiryolu aracı"
+    - "banliyö"
+    - "ray taşlama"
+    - "peron ayırıcı"
+    - "peron kapısı"
+    - "çeker araç"
+    - "tramvay hattı"
   negative_keywords:
     - "oyuncak"
     - "maket"
+    - "kitap"
 
 Su, Kanalizasyon ve Arıtma:
   keywords:
@@ -34,18 +43,33 @@ Su, Kanalizasyon ve Arıtma:
     - "membran"
     - "klorlama"
     - "içme suyu"
+    - "içmesuyu"
     - "kanal"
     - "su kuyusu"
     - "kollektör"
     - "şebeke hattı"
+    - "terfi merkezi"
+    - "su deposu"
+    - "yağmursuyu"
+    - "yağmur suyu"
+    - "büz"
+    - "ızgara"
+    - "debimetre"
+    - "foseptik"
+    - "asbest boru"
+    - "pe100"
+    - "düktil boru"
+    - "sondaj kuyusu"
   negative_keywords:
     - "damacana"
     - "pet şişe"
+    - "bardak su"
 
 İnşaat, Yol ve Altyapı:
   keywords:
     - "inşaat"
     - "yapım işi"
+    - "yapım"
     - "üst yapı"
     - "altyapı"
     - "alt yapı"
@@ -58,8 +82,19 @@ Su, Kanalizasyon ve Arıtma:
     - "köprü"
     - "viyadük"
     - "hafriyat"
+    - "tünel"
+    - "fore kazık"
+    - "istinat duvarı"
+    - "çelik konstrüksiyon"
+    - "çatı onarımı"
+    - "kilit parke"
+    - "kaldırım yapımı"
+    - "peyzaj yapımı"
+    - "kamulaştırma"
+    - "mimari proje"
   negative_keywords:
     - "kitap alımı"
+    - "kırtasiye"
 
 Yazılım, Donanım ve Bilişim:
   keywords:
@@ -78,8 +113,26 @@ Yazılım, Donanım ve Bilişim:
     - "it"
     - "bilişim"
     - "sistem kurulumu"
+    - "bilgisayar alımı"
+    - "yazılım lisansı"
+    - "bulut sunucu"
+    - "cloud"
+    - "veri yedekleme"
+    - "storage"
+    - "antivirüs"
+    - "e-imza"
+    - "kep"
+    - "erp"
+    - "crm"
+    - "sistem odası"
+    - "fiber optik"
+    - "access point"
+    - "kablosuz ağ"
   negative_keywords:
     - "kırtasiye"
+    - "toner"
+    - "kartuş"
+    - "kağıt"
 
 Danışmanlık, Müşavirlik ve Kontrolörlük:
   keywords:
@@ -91,14 +144,22 @@ Danışmanlık, Müşavirlik ve Kontrolörlük:
     - "denetim"
     - "teknik destek"
     - "eğitim hizmeti"
+    - "çevresel etki"
+    - "çed raporu"
+    - "imar planı"
+    - "harita yapımı"
+    - "jeolojik etüd"
   negative_keywords:
     - "reklam"
+    - "tanıtım"
+    - "organizasyon"
 
 Medikal, Sağlık ve Tıbbi Cihaz:
   keywords:
     - "medikal"
     - "tıbbi"
     - "tıbbi cihaz"
+    - "tıbbi cihaz alımı"
     - "hastane"
     - "laboratuvar"
     - "kit"
@@ -109,8 +170,17 @@ Medikal, Sağlık ve Tıbbi Cihaz:
     - "mr"
     - "ultrason"
     - "sağlık"
+    - "cerrahi sarf"
+    - "enjektör"
+    - "gazlı bez"
+    - "dezenfektan"
+    - "ambulans"
+    - "diyaliz"
+    - "ortopedik"
   negative_keywords:
     - "temizlik"
+    - "yemek hizmeti"
+    - "güvenlik"
 
 Enerji, Elektrik ve SCADA:
   keywords:
@@ -129,14 +199,29 @@ Enerji, Elektrik ve SCADA:
     - "plc"
     - "otomasyon"
     - "pano"
+    - "şalt sahası"
+    - "og kablo"
+    - "ag kablo"
+    - "paratoner"
+    - "ups"
+    - "kesintisiz güç"
+    - "aydınlatma direği"
+    - "solar"
+    - "rüzgar türbini"
+    - "reaktif güç"
+    - "kompanzasyon"
   negative_keywords:
     - "yakıt"
+    - "akaryakıt"
+    - "odun"
+    - "kömür"
 
 Makine, Teçhizat ve Yedek Parça:
   keywords:
     - "makine"
     - "teçhizat"
     - "yedek parça"
+    - "yedek parça alımı"
     - "pompa"
     - "motor"
     - "kompresör"
@@ -145,5 +230,16 @@ Makine, Teçhizat ve Yedek Parça:
     - "vinç"
     - "onarım"
     - "bakım"
+    - "revizyon"
+    - "redüktör"
+    - "rulman"
+    - "vana"
+    - "çekvalf"
+    - "kaynak makinesi"
+    - "torna"
+    - "freze"
+    - "hidrolik"
+    - "pnömatik"
   negative_keywords:
     - "bina"
+    - "inşaat yapımı"
