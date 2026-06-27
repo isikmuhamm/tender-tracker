@@ -174,3 +174,19 @@ def test_trigger_scraper(client):
         time.sleep(0.2)
         mock_run_once.assert_called_once()
 
+def test_get_models_endpoint(client):
+    login_resp = client.post(
+        "/api/auth/login",
+        data={"username": "admin", "password": "admin"}
+    )
+    token = login_resp.json()["access_token"]
+    
+    response = client.get(
+        "/api/models?provider=gemini",
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "models" in data
+    assert "gemini-1.5-flash" in data["models"]
+

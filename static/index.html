@@ -68,13 +68,13 @@
                 <span>Tender Tracker</span>
             </div>
             <nav>
-                <a href="#" class="nav-item active" data-target="panel-tenders">
+                <a href="#/tenders" class="nav-item active" data-target="panel-tenders">
                     <i class="fa-solid fa-file-invoice-dollar"></i> İhaleler
                 </a>
-                <a href="#" class="nav-item" data-target="panel-config">
+                <a href="#/config" class="nav-item" data-target="panel-config">
                     <i class="fa-solid fa-sliders"></i> Yapılandırma
                 </a>
-                <a href="#" class="nav-item" data-target="panel-logs">
+                <a href="#/logs" class="nav-item" data-target="panel-logs">
                     <i class="fa-solid fa-terminal"></i> Sistem Logları
                 </a>
             </nav>
@@ -121,9 +121,6 @@
                         <label for="filter-source">Kaynak</label>
                         <select id="filter-source">
                             <option value="">Tümü</option>
-                            <option value="yatirimlar">Yatırımlar Dergisi</option>
-                            <option value="dmo">DMO</option>
-                            <option value="ilan_gov_tr">ilan.gov.tr</option>
                         </select>
                     </div>
                     <div class="filter-group search-group">
@@ -152,11 +149,11 @@
                     
                     <!-- Config Tabs Header -->
                     <div class="config-tabs-bar glass-card">
-                        <button type="button" class="config-tab-btn active" data-tab="tab-general"><i class="fa-solid fa-gears"></i> Genel & LLM</button>
-                        <button type="button" class="config-tab-btn" data-tab="tab-filters"><i class="fa-solid fa-brain"></i> Akıllı Süzgeçler</button>
-                        <button type="button" class="config-tab-btn" data-tab="tab-notifications"><i class="fa-solid fa-envelope"></i> Bildirimler</button>
-                        <button type="button" class="config-tab-btn" data-tab="tab-sectors"><i class="fa-solid fa-tags"></i> Sektörler</button>
-                        <button type="button" class="config-tab-btn" data-tab="tab-security"><i class="fa-solid fa-key"></i> Şifre Değiştir</button>
+                        <a href="#/config/general" class="config-tab-btn active" data-tab="tab-general"><i class="fa-solid fa-gears"></i> Genel & LLM</a>
+                        <a href="#/config/filters" class="config-tab-btn" data-tab="tab-filters"><i class="fa-solid fa-brain"></i> Akıllı Süzgeçler</a>
+                        <a href="#/config/notifications" class="config-tab-btn" data-tab="tab-notifications"><i class="fa-solid fa-envelope"></i> Bildirimler</a>
+                        <a href="#/config/sectors" class="config-tab-btn" data-tab="tab-sectors"><i class="fa-solid fa-tags"></i> Sektörler</a>
+                        <a href="#/config/security" class="config-tab-btn" data-tab="tab-security"><i class="fa-solid fa-key"></i> Şifre Değiştir</a>
                     </div>
 
                     <form id="config-form">
@@ -204,7 +201,10 @@
                                 </div>
                                 <div class="form-group">
                                     <label for="cfg-gemini-model">Model Adı</label>
-                                    <input type="text" id="cfg-gemini-model" placeholder="gemini-1.5-flash">
+                                    <div class="input-with-button">
+                                        <select id="cfg-gemini-model"></select>
+                                        <button type="button" id="btn-fetch-gemini-models" class="btn-small" title="Modelleri Güncelle"><i class="fa-solid fa-arrows-rotate"></i></button>
+                                    </div>
                                 </div>
                             </div>
 
@@ -217,7 +217,10 @@
                                 </div>
                                 <div class="form-group">
                                     <label for="cfg-openai-model">Model Adı</label>
-                                    <input type="text" id="cfg-openai-model" placeholder="gpt-4o-mini">
+                                    <div class="input-with-button">
+                                        <select id="cfg-openai-model"></select>
+                                        <button type="button" id="btn-fetch-openai-models" class="btn-small" title="Modelleri Güncelle"><i class="fa-solid fa-arrows-rotate"></i></button>
+                                    </div>
                                 </div>
                                 <div class="form-group">
                                     <label for="cfg-openai-url">API Uç Noktası (Base URL)</label>
@@ -234,7 +237,10 @@
                                 </div>
                                 <div class="form-group">
                                     <label for="cfg-claude-model">Model Adı</label>
-                                    <input type="text" id="cfg-claude-model" placeholder="claude-3-5-sonnet-20241022">
+                                    <div class="input-with-button">
+                                        <select id="cfg-claude-model"></select>
+                                        <button type="button" id="btn-fetch-claude-models" class="btn-small" title="Modelleri Güncelle"><i class="fa-solid fa-arrows-rotate"></i></button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -246,6 +252,10 @@
                                 <button type="button" id="btn-add-filter" class="btn-small-primary"><i class="fa-solid fa-plus"></i> Süzgeç Ekle</button>
                             </div>
                             <p class="section-desc">Geniş sektör filtresini geçen ihaleleri, kendi belirleyeceğiniz özel LLM süzgeçleriyle tarayıp sadece ilgilendiğiniz kelimeleri ayıklayabilirsiniz.</p>
+                            <div class="info-alert" style="margin-bottom: 15px; padding: 12px 15px; background: rgba(56, 189, 248, 0.08); border-left: 4px solid var(--primary-color); border-radius: 6px; font-size: 13px; color: var(--text-primary); line-height: 1.5;">
+                                <i class="fa-solid fa-lightbulb" style="color: var(--primary-color); margin-right: 8px;"></i>
+                                <strong>Token Tasarrufu Tavsiyesi:</strong> Bu bölümün, <strong>Sektörler</strong> sekmesindeki yerel kelime listesiyle beraber kullanılması önemle tavsiye edilir. Geniş filtrelemeyi önce yerel anahtar kelimelerle yaparak elenen ihaleleri LLM'e göndermemek, API kullanım maliyetlerinizi ve token tüketiminizi ciddi oranda düşürür.
+                            </div>
                             <div class="table-wrapper">
                                 <table class="settings-table">
                                     <thead>
@@ -367,6 +377,66 @@
                 </div>
             </section>
         </main>
+    </div>
+
+    <!-- Sector Modal -->
+    <div id="sector-modal" class="modal-overlay d-none">
+        <div class="modal-card glass-card">
+            <div class="modal-header">
+                <h3 id="sector-modal-title">Sektör Ekle</h3>
+                <button type="button" class="modal-close-btn">&times;</button>
+            </div>
+            <form id="sector-modal-form">
+                <!-- Keep track of original name if editing -->
+                <input type="hidden" id="modal-sector-orig-name">
+                <div class="form-group">
+                    <label for="modal-sector-name">Sektör İsmi</label>
+                    <input type="text" id="modal-sector-name" required placeholder="Örn: Raylı Sistemler">
+                </div>
+                <div class="form-group">
+                    <label for="modal-sector-keywords">Anahtar Kelimeler (Her satıra bir tane yazın)</label>
+                    <textarea id="modal-sector-keywords" rows="4" placeholder="metro&#10;tcdd&#10;tren" style="resize: vertical; width: 100%; padding: 11px 14px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); font-family: inherit; font-size: 14px; outline: none;"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="modal-sector-negatives">Yasaklı Anahtar Kelimeler (Her satıra bir tane yazın)</label>
+                    <textarea id="modal-sector-negatives" rows="4" placeholder="oyuncak&#10;maket" style="resize: vertical; width: 100%; padding: 11px 14px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); font-family: inherit; font-size: 14px; outline: none;"></textarea>
+                </div>
+                <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px;">
+                    <button type="button" class="btn-secondary modal-cancel-btn" style="padding: 10px 20px;">Vazgeç</button>
+                    <button type="submit" class="btn-primary" style="padding: 10px 20px;">Kaydet</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Smart Filter Modal -->
+    <div id="filter-modal" class="modal-overlay d-none">
+        <div class="modal-card glass-card">
+            <div class="modal-header">
+                <h3 id="filter-modal-title">Akıllı Süzgeç Ekle</h3>
+                <button type="button" class="modal-close-btn">&times;</button>
+            </div>
+            <form id="filter-modal-form">
+                <!-- Keep track of original id if editing -->
+                <input type="hidden" id="modal-filter-orig-id">
+                <div class="form-group">
+                    <label for="modal-filter-id">Süzgeç ID (Benzersiz, küçük harf ve alt çizgili İngilizce karakter)</label>
+                    <input type="text" id="modal-filter-id" required placeholder="Örn: metro_plc" pattern="[a-z0-9_]+">
+                </div>
+                <div class="form-group">
+                    <label for="modal-filter-name">Süzgeç İsmi</label>
+                    <input type="text" id="modal-filter-name" required placeholder="Örn: Metro & PLC">
+                </div>
+                <div class="form-group">
+                    <label for="modal-filter-prompt">Yapay Zeka Yönergesi (Prompt)</label>
+                    <textarea id="modal-filter-prompt" rows="5" required placeholder="İhale içeriğinde demiryolu, metro hatlarında kullanılacak PLC, SCADA veya otomasyon kontrol cihazı alımı geçiyor mu?" style="resize: vertical; width: 100%; padding: 11px 14px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); font-family: inherit; font-size: 14px; outline: none;"></textarea>
+                </div>
+                <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px;">
+                    <button type="button" class="btn-secondary modal-cancel-btn" style="padding: 10px 20px;">Vazgeç</button>
+                    <button type="submit" class="btn-primary" style="padding: 10px 20px;">Kaydet</button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <!-- Notification Toast -->

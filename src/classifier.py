@@ -42,6 +42,8 @@ class TenderClassifier:
         max_score = 0
         
         for sector_name, rules in self.sectors.items():
+            if not rules.get("enabled", True):
+                continue
             negatives = rules.get("negative_keywords", [])
             has_negative = False
             for nw in negatives:
@@ -75,7 +77,7 @@ class TenderClassifier:
         if not self.ai_enabled:
             return None
             
-        sectors_list = list(self.sectors.keys())
+        sectors_list = [name for name, rules in self.sectors.items() if rules.get("enabled", True)]
         prompt = f"""
         Aşağıdaki ihale başlığı ve detayını analiz ederek bu ihaleyi şu sektör listesinden en uygun olanına sınıflandır: {sectors_list}.
         Eğer ihale bu listedeki hiçbir sektöre uymuyorsa, "sector" değerini null olarak ata.

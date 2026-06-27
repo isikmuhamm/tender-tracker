@@ -648,6 +648,7 @@ header h1 {
     border-radius: 8px;
     cursor: pointer;
     transition: all 0.3s ease;
+    text-decoration: none;
     white-space: nowrap;
     display: flex;
     align-items: center;
@@ -957,5 +958,118 @@ input:checked + .slider:before {
     padding: 3px 8px;
     border-radius: 6px;
     font-weight: 500;
+}
+
+/* Input with button container */
+.input-with-button {
+    display: flex;
+    gap: 10px;
+}
+.input-with-button select {
+    flex-grow: 1;
+}
+.input-with-button button {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-radius: 8px;
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.3s;
+}
+.input-with-button button:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+/* Modal Overlay & Card CSS */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 3000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+.modal-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+.modal-card {
+    width: 90%;
+    max-width: 550px;
+    padding: 30px;
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+    transform: translateY(20px);
+    transition: transform 0.3s ease;
+}
+.modal-overlay.active .modal-card {
+    transform: translateY(0);
+}
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 12px;
+}
+.modal-header h3 {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--primary-color);
+}
+.modal-close-btn {
+    background: transparent;
+    border: none;
+    font-size: 24px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    line-height: 1;
+    transition: color 0.2s;
+}
+.modal-close-btn:hover {
+    color: var(--accent-red);
+}
+
+/* Sektör Akordeon Header Güncellemeleri */
+.sector-acc-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.sector-acc-actions {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+.sector-delete-btn {
+    background: transparent;
+    border: none;
+    color: var(--accent-red);
+    cursor: pointer;
+    font-size: 14px;
+    padding: 4px 8px;
+    transition: color 0.2s;
+}
+.sector-delete-btn:hover {
+    color: #f87171;
 }
 

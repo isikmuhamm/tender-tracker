@@ -85,6 +85,23 @@ document.addEventListener("DOMContentLoaded", () => {
     // Logs elements
     const logsViewer = document.getElementById("logs-viewer");
     const btnRefreshLogs = document.getElementById("btn-refresh-logs");
+
+    // Modal elements
+    const sectorModal = document.getElementById("sector-modal");
+    const sectorModalForm = document.getElementById("sector-modal-form");
+    const sectorModalTitle = document.getElementById("sector-modal-title");
+    const modalSectorOrigName = document.getElementById("modal-sector-orig-name");
+    const modalSectorName = document.getElementById("modal-sector-name");
+    const modalSectorKeywords = document.getElementById("modal-sector-keywords");
+    const modalSectorNegatives = document.getElementById("modal-sector-negatives");
+
+    const filterModal = document.getElementById("filter-modal");
+    const filterModalForm = document.getElementById("filter-modal-form");
+    const filterModalTitle = document.getElementById("filter-modal-title");
+    const modalFilterOrigId = document.getElementById("modal-filter-orig-id");
+    const modalFilterId = document.getElementById("modal-filter-id");
+    const modalFilterName = document.getElementById("modal-filter-name");
+    const modalFilterPrompt = document.getElementById("modal-filter-prompt");
     
     // Local state variables
     let activePanel = "panel-tenders";
@@ -250,48 +267,77 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // =========================================================
-    // SIDEBAR & TABS NAVIGATION
+    // SIDEBAR & TABS NAVIGATION (Hash Routing)
     // =========================================================
-    sidebarItems.forEach(item => {
-        item.addEventListener("click", (e) => {
-            e.preventDefault();
-            sidebarItems.forEach(i => i.classList.remove("active"));
-            item.classList.add("active");
+    function handleRouting() {
+        const hash = window.location.hash || "#/tenders";
+        
+        let targetPanelId = "panel-tenders";
+        let targetNavItem = document.querySelector('.nav-item[data-target="panel-tenders"]');
+        let activeConfigTab = "tab-general";
+        
+        if (hash.startsWith("#/config")) {
+            targetPanelId = "panel-config";
+            targetNavItem = document.querySelector('.nav-item[data-target="panel-config"]');
             
-            const target = item.getAttribute("data-target");
-            activePanel = target;
-            
-            panelSections.forEach(p => p.classList.add("d-none"));
-            document.getElementById(target).classList.remove("d-none");
-            
-            headerTitle.textContent = item.textContent.trim();
-            
-            if (target === "panel-tenders") {
-                loadTenders();
-            } else if (target === "panel-config") {
-                loadConfigFromServer();
-            } else if (target === "panel-logs") {
-                loadLogs();
+            const parts = hash.split("/");
+            if (parts.length > 2) {
+                const sub = parts[2];
+                if (sub === "filters") activeConfigTab = "tab-filters";
+                else if (sub === "notifications") activeConfigTab = "tab-notifications";
+                else if (sub === "sectors") activeConfigTab = "tab-sectors";
+                else if (sub === "security") activeConfigTab = "tab-security";
             }
-        });
-    });
-
-    // Configuration Tabs
-    tabButtons.forEach(btn => {
-        btn.addEventListener("click", () => {
-            tabButtons.forEach(b => b.classList.remove("active"));
-            btn.classList.add("active");
-            
-            const tabId = btn.getAttribute("data-tab");
+        } else if (hash === "#/logs") {
+            targetPanelId = "panel-logs";
+            targetNavItem = document.querySelector('.nav-item[data-target="panel-logs"]');
+        }
+        
+        // Update active class on nav items
+        sidebarItems.forEach(i => i.classList.remove("active"));
+        if (targetNavItem) targetNavItem.classList.add("active");
+        
+        // Switch visible panels
+        panelSections.forEach(p => p.classList.add("d-none"));
+        const targetPanel = document.getElementById(targetPanelId);
+        if (targetPanel) targetPanel.classList.remove("d-none");
+        
+        // Update header title
+        if (targetNavItem) {
+            headerTitle.textContent = targetNavItem.textContent.trim();
+        }
+        
+        // Handle config sub-tabs active styling and visibility
+        if (targetPanelId === "panel-config") {
+            tabButtons.forEach(btn => {
+                const tabId = btn.getAttribute("data-tab");
+                if (tabId === activeConfigTab) {
+                    btn.classList.add("active");
+                } else {
+                    btn.classList.remove("active");
+                }
+            });
             tabContents.forEach(content => {
-                if (content.id === tabId) {
+                if (content.id === activeConfigTab) {
                     content.classList.remove("d-none");
                 } else {
                     content.classList.add("d-none");
                 }
             });
-        });
-    });
+        }
+        
+        // Trigger panel load actions
+        activePanel = targetPanelId;
+        if (targetPanelId === "panel-tenders") {
+            loadTenders();
+        } else if (targetPanelId === "panel-config") {
+            loadConfigFromServer();
+        } else if (targetPanelId === "panel-logs") {
+            loadLogs();
+        }
+    }
+    
+    window.addEventListener("hashchange", handleRouting);
 
     // Toggle active provider config block
     cfgLlmProvider.addEventListener("change", () => {
@@ -409,6 +455,131 @@ document.addEventListener("DOMContentLoaded", () => {
     // =========================================================
     // PANEL: CONFIGURATION
     // =========================================================
+    // --- Central Sources configuration ---
+    const ALL_SOURCES = {
+        "yatirimlar": "Yatırımlar Dergisi",
+        "dmo": "DMO",
+        "ilan_gov_tr": "ilan.gov.tr",
+        "ekapv2": "EKAPv2"
+    };
+
+    function populateSourcesFilter() {
+        const currentSel = filterSource.value;
+        filterSource.innerHTML = '<option value="">Tümü</option>';
+        Object.entries(ALL_SOURCES).forEach(([val, name]) => {
+            const opt = document.createElement("option");
+            opt.value = val;
+            opt.textContent = name;
+            if (val === currentSel) opt.selected = true;
+            filterSource.appendChild(opt);
+        });
+    }
+
+    // --- Modal overlays helpers ---
+    function openModal(modalEl) {
+        modalEl.classList.remove("d-none");
+        modalEl.offsetHeight; // force layout reflow
+        modalEl.classList.add("active");
+    }
+
+    function closeModal(modalEl) {
+        modalEl.classList.remove("active");
+        setTimeout(() => {
+            modalEl.classList.add("d-none");
+        }, 300);
+    }
+
+    document.querySelectorAll(".modal-close-btn, .modal-cancel-btn").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+            const openModalEl = e.target.closest(".modal-overlay");
+            if (openModalEl) closeModal(openModalEl);
+        });
+    });
+
+    // --- Dynamic LLM Model Loader ---
+    async function loadLlmModels(provider, selectElement, currentModel, apiKey = "") {
+        selectElement.innerHTML = "";
+        
+        let url = `${API_BASE}/api/models?provider=${provider}`;
+        if (apiKey) {
+            url += `&api_key=${encodeURIComponent(apiKey)}`;
+        }
+        
+        const defaults = {
+            "gemini": ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash-exp"],
+            "openai": ["gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo"],
+            "claude": ["claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022", "claude-3-opus-20240229"]
+        };
+        
+        let models = [];
+        try {
+            const response = await apiRequest(url);
+            if (response && response.ok) {
+                const data = await response.json();
+                models = data.models || [];
+            }
+        } catch (err) {
+            console.error("Modeller yüklenirken hata:", err);
+        }
+        
+        if (models.length === 0) {
+            models = defaults[provider] || [];
+        }
+        
+        if (currentModel && !models.includes(currentModel)) {
+            models.unshift(currentModel);
+        }
+        
+        models.forEach(m => {
+            const opt = document.createElement("option");
+            opt.value = m;
+            opt.textContent = m;
+            selectElement.appendChild(opt);
+        });
+        
+        if (currentModel) {
+            selectElement.value = currentModel;
+        } else if (models.length > 0) {
+            selectElement.value = models[0];
+        }
+    }
+
+    // Register refresh models listeners
+    document.getElementById("btn-fetch-gemini-models").addEventListener("click", async () => {
+        const btn = document.getElementById("btn-fetch-gemini-models");
+        btn.disabled = true;
+        const icon = btn.querySelector("i");
+        icon.classList.add("spin");
+        await loadLlmModels("gemini", cfgGeminiModel, cfgGeminiModel.value, cfgGeminiKey.value.trim());
+        icon.classList.remove("spin");
+        btn.disabled = false;
+        showToast("Gemini model listesi güncellendi.");
+    });
+    
+    document.getElementById("btn-fetch-openai-models").addEventListener("click", async () => {
+        const btn = document.getElementById("btn-fetch-openai-models");
+        btn.disabled = true;
+        const icon = btn.querySelector("i");
+        icon.classList.add("spin");
+        await loadLlmModels("openai", cfgOpenaiModel, cfgOpenaiModel.value, cfgOpenaiKey.value.trim());
+        icon.classList.remove("spin");
+        btn.disabled = false;
+        showToast("OpenAI model listesi güncellendi.");
+    });
+    
+    document.getElementById("btn-fetch-claude-models").addEventListener("click", async () => {
+        const btn = document.getElementById("btn-fetch-claude-models");
+        btn.disabled = true;
+        const icon = btn.querySelector("i");
+        icon.classList.add("spin");
+        await loadLlmModels("claude", cfgClaudeModel, cfgClaudeModel.value, cfgClaudeKey.value.trim());
+        icon.classList.remove("spin");
+        btn.disabled = false;
+        showToast("Claude model listesi güncellendi.");
+    });
+
+    // PANEL: CONFIGURATION
+    // =========================================================
     async function loadConfigFromServer() {
         const response = await apiRequest("/api/config");
         if (!response || !response.ok) return;
@@ -440,17 +611,17 @@ document.addEventListener("DOMContentLoaded", () => {
         cfgLlmProvider.value = settings.active_llm_provider || "none";
         cfgLlmProvider.dispatchEvent(new Event("change"));
         
-        // Providers keys
+        // Providers keys & models
         const providers = settings.llm_providers || {};
         cfgGeminiKey.value = providers.gemini?.api_key || "";
-        cfgGeminiModel.value = providers.gemini?.model || "gemini-1.5-flash";
+        await loadLlmModels("gemini", cfgGeminiModel, providers.gemini?.model || "gemini-1.5-flash", providers.gemini?.api_key);
         
         cfgOpenaiKey.value = providers.openai?.api_key || "";
-        cfgOpenaiModel.value = providers.openai?.model || "gpt-4o-mini";
         cfgOpenaiUrl.value = providers.openai?.base_url || "https://api.openai.com/v1";
+        await loadLlmModels("openai", cfgOpenaiModel, providers.openai?.model || "gpt-4o-mini", providers.openai?.api_key);
         
         cfgClaudeKey.value = providers.claude?.api_key || "";
-        cfgClaudeModel.value = providers.claude?.model || "claude-3-5-sonnet-20241022";
+        await loadLlmModels("claude", cfgClaudeModel, providers.claude?.model || "claude-3-5-sonnet-20241022", providers.claude?.api_key);
         
         // SMTP & Telegram
         cfgSmtpServer.value = email.smtp_server || "";
@@ -479,18 +650,21 @@ document.addEventListener("DOMContentLoaded", () => {
         const currentSectorSel = filterSector.value;
         filterSector.innerHTML = '<option value="">Tümü</option>';
         Object.keys(localSectors).forEach(secName => {
-            const opt = document.createElement("option");
-            opt.value = secName;
-            opt.textContent = secName;
-            if (secName === currentSectorSel) opt.selected = true;
-            filterSector.appendChild(opt);
+            const secInfo = localSectors[secName] || {};
+            if (secInfo.enabled !== false) {
+                const opt = document.createElement("option");
+                opt.value = secName;
+                opt.textContent = secName;
+                if (secName === currentSectorSel) opt.selected = true;
+                filterSector.appendChild(opt);
+            }
         });
 
         // Smart custom filters dropdown
         const currentCustomSel = filterCustom.value;
         filterCustom.innerHTML = '<option value="">Tümü</option>';
         localCustomFilters.forEach(f => {
-            if (f.enabled) {
+            if (f.enabled !== false) {
                 const opt = document.createElement("option");
                 opt.value = f.id;
                 opt.textContent = f.name;
@@ -511,50 +685,48 @@ document.addEventListener("DOMContentLoaded", () => {
         localCustomFilters.forEach((f, idx) => {
             const tr = document.createElement("tr");
             tr.innerHTML = `
-                <td><input type="text" class="filter-row-name" data-index="${idx}" value="${f.name || ""}" required></td>
-                <td><input type="text" class="filter-row-prompt" data-index="${idx}" value="${f.prompt_instruction || ""}" required></td>
+                <td><strong>${f.name || ""}</strong><br><small style="color: var(--text-secondary)">ID: ${f.id}</small></td>
+                <td>${f.prompt_instruction || ""}</td>
                 <td style="text-align: center;">
                     <label class="switch">
-                        <input type="checkbox" class="filter-row-toggle" data-index="${idx}" ${f.enabled ? "checked" : ""}>
+                        <input type="checkbox" class="filter-row-toggle" data-index="${idx}" ${f.enabled !== false ? "checked" : ""}>
                         <span class="slider"></span>
                     </label>
                 </td>
                 <td style="text-align: center;">
+                    <button type="button" class="btn-small btn-edit-filter" data-index="${idx}" style="margin-right: 5px;"><i class="fa-solid fa-edit"></i></button>
                     <button type="button" class="btn-icon-red btn-delete-filter" data-index="${idx}"><i class="fa-solid fa-trash"></i></button>
                 </td>
             `;
             customFiltersList.appendChild(tr);
         });
 
-        // Add events for inputs inside dynamic list
-        document.querySelectorAll(".filter-row-name").forEach(el => {
-            el.addEventListener("input", (e) => {
-                const idx = parseInt(e.target.getAttribute("data-index"));
-                localCustomFilters[idx].name = e.target.value;
-                // Generate a safe dynamic ID if new
-                if (!localCustomFilters[idx].id) {
-                    localCustomFilters[idx].id = "filter_" + Math.random().toString(36).substr(2, 6);
-                }
-            });
-        });
-
-        document.querySelectorAll(".filter-row-prompt").forEach(el => {
-            el.addEventListener("input", (e) => {
-                const idx = parseInt(e.target.getAttribute("data-index"));
-                localCustomFilters[idx].prompt_instruction = e.target.value;
-            });
-        });
-
         document.querySelectorAll(".filter-row-toggle").forEach(el => {
             el.addEventListener("change", (e) => {
-                const idx = parseInt(e.target.getAttribute("data-index"));
-                localCustomFilters[idx].enabled = e.target.checked;
+                const idx = parseInt(el.getAttribute("data-index"));
+                localCustomFilters[idx].enabled = el.checked;
+            });
+        });
+
+        document.querySelectorAll(".btn-edit-filter").forEach(btn => {
+            btn.addEventListener("click", (e) => {
+                const targetBtn = btn.closest(".btn-edit-filter");
+                const idx = parseInt(targetBtn.getAttribute("data-index"));
+                const f = localCustomFilters[idx];
+                
+                modalFilterOrigId.value = f.id;
+                modalFilterId.value = f.id;
+                modalFilterName.value = f.name;
+                modalFilterPrompt.value = f.prompt_instruction || "";
+                
+                filterModalTitle.textContent = "Akıllı Süzgeç Düzenle";
+                openModal(filterModal);
             });
         });
 
         document.querySelectorAll(".btn-delete-filter").forEach(el => {
             el.addEventListener("click", (e) => {
-                const targetBtn = e.target.closest(".btn-delete-filter");
+                const targetBtn = el.closest(".btn-delete-filter");
                 const idx = parseInt(targetBtn.getAttribute("data-index"));
                 localCustomFilters.splice(idx, 1);
                 renderCustomFiltersTable();
@@ -563,12 +735,45 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     btnAddFilter.addEventListener("click", () => {
-        localCustomFilters.push({
-            id: "filter_" + Math.random().toString(36).substr(2, 6),
-            name: "Yeni Süzgeç",
-            prompt_instruction: "",
-            enabled: true
-        });
+        modalFilterOrigId.value = "";
+        modalFilterId.value = "filter_" + Math.random().toString(36).substr(2, 6);
+        modalFilterName.value = "";
+        modalFilterPrompt.value = "";
+        filterModalTitle.textContent = "Yeni Akıllı Süzgeç Ekle";
+        openModal(filterModal);
+    });
+
+    filterModalForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const origId = modalFilterOrigId.value;
+        const newId = modalFilterId.value.trim();
+        const newName = modalFilterName.value.trim();
+        const newPrompt = modalFilterPrompt.value.trim();
+        
+        if (!newId || !newName) return;
+        
+        if (newId !== origId && localCustomFilters.some(f => f.id === newId)) {
+            alert("Bu ID değerine sahip başka bir süzgeç zaten tanımlı!");
+            return;
+        }
+        
+        if (origId) {
+            const idx = localCustomFilters.findIndex(f => f.id === origId);
+            if (idx !== -1) {
+                localCustomFilters[idx].id = newId;
+                localCustomFilters[idx].name = newName;
+                localCustomFilters[idx].prompt_instruction = newPrompt;
+            }
+        } else {
+            localCustomFilters.push({
+                id: newId,
+                name: newName,
+                prompt_instruction: newPrompt,
+                enabled: true
+            });
+        }
+        
+        closeModal(filterModal);
         renderCustomFiltersTable();
     });
 
@@ -596,17 +801,18 @@ document.addEventListener("DOMContentLoaded", () => {
                         <i class="fa-solid fa-chevron-right acc-arrow"></i>
                         <span>${name}</span>
                     </div>
-                    <button type="button" class="btn-icon-red btn-delete-sector" data-name="${name}"><i class="fa-solid fa-trash"></i></button>
+                    <div class="sector-acc-actions">
+                        <label class="switch" title="Sektörü Etkinleştir / Devre Dışı Bırak">
+                            <input type="checkbox" class="sector-row-toggle" data-name="${name}" ${rules.enabled !== false ? "checked" : ""}>
+                            <span class="slider"></span>
+                        </label>
+                        <button type="button" class="btn-small-primary btn-edit-sector" data-name="${name}"><i class="fa-solid fa-edit"></i> Düzenle</button>
+                        <button type="button" class="btn-icon-red btn-delete-sector" data-name="${name}"><i class="fa-solid fa-trash"></i></button>
+                    </div>
                 </div>
                 <div class="sector-acc-body d-none">
-                    <div class="form-group" style="margin-top: 15px;">
-                        <label>Pozitif Anahtar Kelimeler (Virgülle ayırın)</label>
-                        <input type="text" class="sector-keywords-input" data-name="${name}" value="${keywords.join(", ")}">
-                    </div>
-                    <div class="form-group">
-                        <label>Negatif Anahtar Kelimeler (Geri kalanları eler, virgülle ayırın)</label>
-                        <input type="text" class="sector-negatives-input" data-name="${name}" value="${negativeKeywords.join(", ")}">
-                    </div>
+                    <p style="margin-top: 15px; font-size: 13px;"><strong>Anahtar Kelimeler:</strong> ${keywords.length > 0 ? keywords.join(", ") : "<em>Tanımlanmamış</em>"}</p>
+                    <p style="font-size: 13px;"><strong>Yasaklı Kelimeler:</strong> ${negativeKeywords.length > 0 ? negativeKeywords.join(", ") : "<em>Tanımlanmamış</em>"}</p>
                 </div>
             `;
             sectorsAccordionContainer.appendChild(card);
@@ -615,8 +821,7 @@ document.addEventListener("DOMContentLoaded", () => {
         // Accordion Toggle
         document.querySelectorAll(".sector-acc-header").forEach(header => {
             header.addEventListener("click", (e) => {
-                // If trash button is clicked, do not toggle accordion
-                if (e.target.closest(".btn-delete-sector")) return;
+                if (e.target.closest(".sector-acc-actions")) return;
                 
                 const body = header.nextElementSibling;
                 const arrow = header.querySelector(".acc-arrow");
@@ -631,6 +836,34 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         });
 
+        // Sector row toggles
+        document.querySelectorAll(".sector-row-toggle").forEach(el => {
+            el.addEventListener("change", (e) => {
+                const name = el.getAttribute("data-name");
+                if (localSectors[name]) {
+                    localSectors[name].enabled = el.checked;
+                }
+            });
+        });
+
+        // Edit Sector Modal trigger
+        document.querySelectorAll(".btn-edit-sector").forEach(btn => {
+            btn.addEventListener("click", (e) => {
+                const name = btn.getAttribute("data-name");
+                const rules = localSectors[name] || {};
+                const keywords = rules.keywords || [];
+                const negativeKeywords = rules.negative_keywords || [];
+                
+                modalSectorOrigName.value = name;
+                modalSectorName.value = name;
+                modalSectorKeywords.value = keywords.join("\n");
+                modalSectorNegatives.value = negativeKeywords.join("\n");
+                
+                sectorModalTitle.textContent = "Sektör Düzenle";
+                openModal(sectorModal);
+            });
+        });
+
         // Delete Sector
         document.querySelectorAll(".btn-delete-sector").forEach(btn => {
             btn.addEventListener("click", (e) => {
@@ -639,37 +872,51 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (confirm(`"${name}" sektörünü silmek istediğinize emin misiniz?`)) {
                     delete localSectors[name];
                     renderSectorsAccordion();
+                    populateMainFilters();
                 }
-            });
-        });
-
-        // Keywords change events
-        document.querySelectorAll(".sector-keywords-input").forEach(el => {
-            el.addEventListener("change", (e) => {
-                const name = e.target.getAttribute("data-name");
-                localSectors[name].keywords = e.target.value.split(",").map(k => k.trim()).filter(k => k);
-            });
-        });
-
-        document.querySelectorAll(".sector-negatives-input").forEach(el => {
-            el.addEventListener("change", (e) => {
-                const name = e.target.getAttribute("data-name");
-                localSectors[name].negative_keywords = e.target.value.split(",").map(k => k.trim()).filter(k => k);
             });
         });
     }
 
     btnAddSector.addEventListener("click", () => {
-        const name = prompt("Eklenecek Sektör Adı:");
-        if (name && name.trim()) {
-            const trimmed = name.trim();
-            if (localSectors[trimmed]) {
-                alert("Bu isimde bir sektör zaten tanımlı!");
-                return;
-            }
-            localSectors[trimmed] = { keywords: [], negative_keywords: [] };
-            renderSectorsAccordion();
+        modalSectorOrigName.value = "";
+        modalSectorName.value = "";
+        modalSectorKeywords.value = "";
+        modalSectorNegatives.value = "";
+        sectorModalTitle.textContent = "Yeni Sektör Ekle";
+        openModal(sectorModal);
+    });
+
+    sectorModalForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const origName = modalSectorOrigName.value;
+        const newName = modalSectorName.value.trim();
+        
+        if (!newName) return;
+        
+        if (newName !== origName && localSectors[newName]) {
+            alert("Bu isimde bir sektör zaten tanımlı!");
+            return;
         }
+        
+        const keywords = modalSectorKeywords.value.split("\n").map(k => k.trim()).filter(k => k);
+        const negatives = modalSectorNegatives.value.split("\n").map(k => k.trim()).filter(k => k);
+        
+        const enabled = origName ? (localSectors[origName].enabled !== false) : true;
+        
+        if (origName && newName !== origName) {
+            delete localSectors[origName];
+        }
+        
+        localSectors[newName] = {
+            enabled: enabled,
+            keywords: keywords,
+            negative_keywords: negatives
+        };
+        
+        closeModal(sectorModal);
+        renderSectorsAccordion();
+        populateMainFilters();
     });
 
     // Change Password submit
@@ -831,8 +1078,8 @@ document.addEventListener("DOMContentLoaded", () => {
     // INITIALIZATION & UTIL
     // =========================================================
     function initApp() {
-        loadTenders();
-        loadConfigFromServer();
+        populateSourcesFilter();
+        handleRouting();
     }
 
     function debounce(func, wait) {

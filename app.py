@@ -263,6 +263,78 @@ def save_config(
             detail=f"Dosyalar kaydedilirken hata oluştu: {e}"
         )
 
+@app.get("/api/models")
+def get_models(provider: str, api_key: str = None, current_user: User = Depends(get_current_user)):
+    """
+    Belirtilen LLM sağlayıcısı ve API key için kullanılabilecek model listesini çeker.
+    Eğer API key sağlanmamışsa, kayıtlı config.yaml dosyasından okumayı dener.
+    Eğer hata oluşursa veya API key geçersizse varsayılan model listesini döner.
+    """
+    import requests
+    defaults = {
+        "gemini": ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash-exp"],
+        "openai": ["gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo"],
+        "claude": ["claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022", "claude-3-opus-20240229"]
+    }
+    
+    if not api_key:
+        config_path = get_data_path("config.yaml")
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    cfg = yaml.safe_load(f) or {}
+                    providers = cfg.get("settings", {}).get("llm_providers", {})
+                    p_cfg = providers.get(provider, {})
+                    api_key = p_cfg.get("api_key")
+            except Exception:
+                pass
+                
+    if not api_key:
+        return {"models": defaults.get(provider, [])}
+        
+    try:
+        if provider == "gemini":
+            url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
+            res = requests.get(url, timeout=5)
+            if res.status_code == 200:
+                data = res.json()
+                models = [m["name"].split("/")[-1] for m in data.get("models", []) if "generateContent" in m.get("supportedGenerationMethods", [])]
+                if models:
+                    return {"models": models}
+        elif provider == "openai":
+            base_url = "https://api.openai.com/v1"
+            config_path = get_data_path("config.yaml")
+            if os.path.exists(config_path):
+                try:
+                    with open(config_path, "r", encoding="utf-8") as f:
+                        cfg = yaml.safe_load(f) or {}
+                        base_url = cfg.get("settings", {}).get("llm_providers", {}).get("openai", {}).get("base_url", base_url)
+                except Exception:
+                    pass
+            url = f"{base_url.rstrip('/')}/models"
+            res = requests.get(url, headers={"Authorization": f"Bearer {api_key}"}, timeout=5)
+            if res.status_code == 200:
+                data = res.json()
+                models = [m["id"] for m in data.get("data", [])]
+                if models:
+                    return {"models": sorted(models)}
+        elif provider == "claude":
+            url = "https://api.anthropic.com/v1/models"
+            headers = {
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01"
+            }
+            res = requests.get(url, headers=headers, timeout=5)
+            if res.status_code == 200:
+                data = res.json()
+                models = [m["id"] for m in data.get("data", [])]
+                if models:
+                    return {"models": models}
+    except Exception as e:
+        logging.error(f"Modeller çekilirken hata: {e}")
+        
+    return {"models": defaults.get(provider, [])}
+
 # =========================================================
 # LOGS API
 # =========================================================
