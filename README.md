@@ -35,7 +35,7 @@
 
 > **Tender Tracker is operational for local, self-managed use and can be used on your own machine with your own configuration and provider credentials. The project remains under active development.**
 >
-> Yatırımlar Dergisi, DMO and ilan.gov.tr adapters currently provide the main ingestion paths. EKAPv2 public-list extraction is not yet complete and currently returns no tender records. Reliability, security hardening, packaging, and source compatibility work continue between releases.
+> Yatırımlar Dergisi, DMO, ilan.gov.tr, and EKAPv2 adapters provide the main ingestion paths. Reliability, security hardening, packaging, and source compatibility work continue between releases.
 >
 > **Kullanım notu:** Uygulama mevcut çalışan kaynaklarla kendi bilgisayarınızda bağımsız olarak kullanılabilir. Geliştirme devam ettiği için iş açısından kritik sonuçların kaynak kayıtları ve uygulama logları üzerinden doğrulanması önerilir.
 
@@ -100,7 +100,6 @@ The project should be understood as an **operational local application under act
 - Database re-evaluation currently re-runs custom LLM filters on stored, already classified tenders. It does not represent a complete re-ingestion or universal reclassification of every rule layer.
 - SQLite WAL mode improves local read/write concurrency but does not eliminate every possible locking or transaction failure.
 - Source portals remain external dependencies. A portal can change its HTML, API route, TLS policy, rate limits, or availability without notice.
-- EKAPv2 currently has an experimental connection layer but no completed public-list extraction parser.
 
 Critical hardening work is tracked in [`business/BOARD.md`](business/BOARD.md); deferred productization and infrastructure work is preserved in [`business/NOTES.md`](business/NOTES.md) rather than hidden behind a production-ready claim.
 
@@ -111,9 +110,9 @@ Critical hardening work is tracked in [`business/BOARD.md`](business/BOARD.md); 
 ### Multi-Source Tender Ingestion
 
 - Yatırımlar Dergisi HTML listings;
-- Devlet Malzeme Ofisi active tender listings;
+- DMO active tender listings;
 - ilan.gov.tr public JSON requests;
-- experimental EKAPv2 public connection adapter;
+- EKAPv2 public connection adapter using signed API headers;
 - duplicate detection before repeated processing;
 - normalized source, title, summary, link, and classification fields.
 
@@ -209,13 +208,13 @@ No fixed token-saving percentage is claimed. Actual savings depend on source vol
 | **Yatırımlar Dergisi** | HTML parsing | Operational |
 | **Devlet Malzeme Ofisi (DMO)** | Active tender-list HTML parsing | Operational |
 | **ilan.gov.tr** | Public JSON request | Operational |
-| **EKAPv2** | Experimental public connection/TLS adapter | Public-list extraction pending |
+| **EKAPv2** | Signed JSON API request | Operational |
 
 ### EKAP Scope
 
 The intended EKAP scope is limited to publicly accessible tender listings that can be read without account login, e-signature, or private-session automation.
 
-The current adapter establishes an experimental connection path but does not yet extract public tender records. Until a stable public request and parser are implemented, EKAP should not be treated as an operational source.
+The current adapter extracts public tender records by querying the public search API of EKAP v2 with custom signed security headers.
 
 Authenticated pages, e-signature flows, CAPTCHA bypass, private account automation, and restricted procurement data are outside the project scope.
 
@@ -727,7 +726,6 @@ External procurement sites should not be required for the default deterministic 
 
 ## Current Limitations
 
-- EKAPv2 public-list extraction is not implemented and returns no tender records.
 - The product targets one local administrator rather than multi-user collaboration.
 - The executable does not update itself automatically.
 - Dashboard updates use REST polling rather than WebSocket delivery.

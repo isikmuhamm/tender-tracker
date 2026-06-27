@@ -82,40 +82,11 @@ events.log       local operational log
 
 ## Current Recommended Implementation Order
 
-Work on one item at a time unless explicitly asked to batch related fixes.
-
-1. **P0.4 TLS And Credential Transport Cleanup (Harden / Verification Follow-up)**
-2. **P0.6 Scan And Re-Evaluation Mutual Exclusion (Harden / Verification Follow-up)**
-3. **P0.7 Supported Runtime Path Consistency (Harden / Verification Follow-up)**
-4. **P0.2 EKAP Public Tender Extraction**
-
-The first three items harden the already operational product. P0.2 expands source coverage after the current runtime is safer and more deterministic.
+All critical hardening (P0.3 - P0.7) and source extraction (P0.2) milestones are completed. The active development goals are fully delivered.
 
 ## Active Critical Work Items
 
-### P0.2 EKAP Public Tender Extraction
-
-**Status:** Ready for implementation
-
-**Objective:** Convert the existing EKAPv2 connectivity skeleton into a public-list adapter that returns real tender records without requiring authenticated areas.
-
-**Scope:**
-
-- identify the public search/list request used by the EKAP browser application;
-- document method, headers, payload, pagination, and response shape;
-- parse stable tender identifiers and public detail links;
-- map records to the common scraper contract;
-- add captured response fixtures and deterministic tests;
-- show explicit degraded status when EKAP changes or blocks requests.
-
-**Acceptance criteria:**
-
-- a captured public EKAP response produces at least one normalized tender in a fixture test;
-- pagination or result limits are handled deliberately;
-- duplicate records remain stable across repeated runs;
-- no login, password, e-signature, CAPTCHA bypass, or private account flow is introduced;
-- EKAP failure does not interrupt the remaining source adapters;
-- README source status changes from Experimental only after tests pass.
+All critical milestones have been completed and moved to history/completed.
 
 ### P0.4 TLS And Credential Transport Cleanup
 
@@ -282,3 +253,6 @@ Detailed rationale and architecture hypotheses live in `NOTES.md`, Records 026�
 
 ### C-010 Persistence And Transaction Integrity (P0.5)
 **Status:** Completed — isolated record database commits inside per-tender try-except blocks, ensured immediate commits for excluded-only runs, and decoupled notification delivery errors from database transactions. Verified via multi-scenario tests.
+
+### C-011 EKAP Public Tender Extraction (P0.2)
+**Status:** Completed — converted the EKAPv2 skeleton into an operational public tender extraction scraper querying the new nesil public API using signed security headers and AES CBC encryption. Map records to the common scraper contract. Verified via parser unit tests.

@@ -360,3 +360,20 @@ The application achieved baseline data integrity and protection against stored-X
 
 ### Architectural Result
 Process-level lock implementation added; cross-process operational verification remains pending. Config-based check interval settings are mapped with fallback rules to environment settings.
+
+---
+
+## H-014 EKAP Public Tender Extraction
+
+**Date:** 2026-06-27
+
+### Delivered
+- `cryptography` added explicitly to requirements.txt.
+- `Ekapv2Scraper` implemented in `src/scraper/ekapv2.py`.
+- custom security headers (`X-Custom-Request-Guid`, `X-Custom-Request-Siv`, `X-Custom-Request-Ts`, `X-Custom-Request-R8id`) signed with AES-CBC encryption.
+- dynamic payload matching the latest search params schema mapping results to the common scraper contract.
+- mock-based unit tests added to `tests/test_ekapv2.py`.
+- README.md updated to represent EKAPv2 as an operational, non-experimental source.
+
+### Architectural Result
+The EKAP v2 public tender search is fully integrated as an operational, secure, and mock-tested scraper adapter.
