@@ -168,14 +168,17 @@ class TenderClassifier:
         İhaleyi sınıflandırır. 
         Dönen çıktı: (SektörAdı veya None, SınıflandırmaYöntemi)
         """
+        # 1. Öncelikle hızlı yerel kural tabanlı sınıflandırmayı dene (0ms latency)
+        sector = self.classify_local(title, summary)
+        if sector:
+            logger.info(f"İhale yerel kurallarla sınıflandırıldı: '{sector}' | '{title[:40]}...'")
+            return sector, "rule"
+            
+        # 2. Yerel kurallarla eşleşmediyse ve LLM aktifse, LLM ile akıllı sınıflandırma dene
         if self.ai_enabled:
             sector = self.classify_ai(title, summary)
             if sector:
                 logger.info(f"İhale AI ile sınıflandırıldı: '{sector}' | '{title[:40]}...'")
                 return sector, "ai"
                 
-        sector = self.classify_local(title, summary)
-        method = "rule" if sector else "none"
-        if sector:
-            logger.info(f"İhale yerel kurallarla sınıflandırıldı: '{sector}' | '{title[:40]}...'")
-        return sector, method
+        return None, "none"
