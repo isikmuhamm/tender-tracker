@@ -17,8 +17,13 @@ class DmoScraper(BaseScraper):
 
     def fetch(self) -> str:
         logger.info(f"DMO İhale Listesi HTML çekiliyor: {self.url}")
+        logger.warning("TLS verification bypassed for DmoScraper for compatibility.")
+        import warnings
+        import urllib3
         try:
-            r = requests.get(self.url, headers=self.headers, verify=False, timeout=30)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", urllib3.exceptions.InsecureRequestWarning)
+                r = requests.get(self.url, headers=self.headers, verify=False, timeout=30)
             r.raise_for_status()
             return r.text
         except Exception as e:

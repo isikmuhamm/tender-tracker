@@ -10,9 +10,6 @@ from src.database import init_db, SessionLocal, Tender, get_data_path
 # Çevresel değişkenleri yükle
 load_dotenv()
 
-# Urllib3 HTTPS sertifika uyarılarını kapat
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
 # =========================================================
 # LOGGING SETUP
 # =========================================================

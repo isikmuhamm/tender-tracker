@@ -31,13 +31,18 @@ class Ekapv2Scraper(BaseScraper):
 
     def fetch(self) -> str:
         logger.info(f"EKAPv2 bağlantısı test ediliyor: {self.url}")
+        logger.warning("TLS verification bypassed for Ekapv2Scraper for compatibility.")
+        import warnings
+        import urllib3
         session = requests.Session()
         session.headers.update(self.headers)
         session.verify = False
         session.mount("https://ekapv2.kik.gov.tr", TLSAdapter())
         
         try:
-            r = session.get(self.url, timeout=20)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", urllib3.exceptions.InsecureRequestWarning)
+                r = session.get(self.url, timeout=20)
             r.raise_for_status()
             logger.info(f"EKAPv2 bağlantısı başarılı. HTTP Durumu: {r.status_code}")
             return r.text

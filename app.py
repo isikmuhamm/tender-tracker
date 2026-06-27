@@ -4,7 +4,8 @@ import threading
 import yaml
 import logging
 import urllib3
-from fastapi import FastAPI, Depends, HTTPException, status
+from typing import Optional
+from fastapi import FastAPI, Depends, HTTPException, status, Header
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -12,9 +13,6 @@ from sqlalchemy.orm import Session
 from src.database import init_db, get_db, Tender, User, get_data_path
 from src.auth import verify_password, create_access_token, get_current_user
 from src.scheduler import TenderBotOrchestrator
-
-# Urllib3 HTTPS sertifika uyarılarını kapat
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Global logging yapılandırması
 logger = logging.getLogger()
@@ -318,7 +316,11 @@ def save_config(
         )
 
 @app.get("/api/models")
-def get_models(provider: str, api_key: str = None, current_user: User = Depends(get_current_user)):
+def get_models(
+    provider: str,
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+    current_user: User = Depends(get_current_user)
+):
     """
     Belirtilen LLM sağlayıcısı ve API key için kullanılabilecek model listesini çeker.
     Eğer API key sağlanmamışsa, kayıtlı config.yaml dosyasından okumayı dener.
@@ -331,6 +333,7 @@ def get_models(provider: str, api_key: str = None, current_user: User = Depends(
         "claude": ["claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022", "claude-3-opus-20240229"]
     }
     
+    api_key = x_api_key
     if not api_key:
         config_path = get_data_path("config.yaml")
         if os.path.exists(config_path):

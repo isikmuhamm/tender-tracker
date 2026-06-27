@@ -622,9 +622,12 @@ document.addEventListener("DOMContentLoaded", () => {
     async function loadLlmModels(provider, selectElement, currentModel, apiKey = "") {
         selectElement.innerHTML = "";
         
-        let url = `${API_BASE}/api/models?provider=${provider}`;
+        const url = `/api/models?provider=${provider}`;
+        const options = {};
         if (apiKey) {
-            url += `&api_key=${encodeURIComponent(apiKey)}`;
+            options.headers = {
+                "X-API-Key": apiKey
+            };
         }
         
         const defaults = {
@@ -635,7 +638,7 @@ document.addEventListener("DOMContentLoaded", () => {
         
         let models = [];
         try {
-            const response = await apiRequest(url);
+            const response = await apiRequest(url, options);
             if (response && response.ok) {
                 const data = await response.json();
                 models = data.models || [];

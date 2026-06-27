@@ -200,3 +200,21 @@ def test_catchall_frontend_routes(client):
     response3 = client.get("/api/nonexistent")
     assert response3.status_code == 404
 
+def test_get_models_with_header_key(client):
+    login_resp = client.post(
+        "/api/auth/login",
+        data={"username": "admin", "password": "admin"}
+    )
+    token = login_resp.json()["access_token"]
+    
+    response = client.get(
+        "/api/models?provider=gemini",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "X-API-Key": "mock_api_key"
+        }
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "models" in data
+

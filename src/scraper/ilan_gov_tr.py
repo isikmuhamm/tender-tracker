@@ -24,8 +24,13 @@ class IlanGovTrScraper(BaseScraper):
             "skipCount": 0,
             "maxResultCount": 30
         }
+        logger.warning("TLS verification bypassed for IlanGovTrScraper for compatibility.")
+        import warnings
+        import urllib3
         try:
-            r = requests.post(self.url, json=payload, headers=self.headers, timeout=20, verify=False)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", urllib3.exceptions.InsecureRequestWarning)
+                r = requests.post(self.url, json=payload, headers=self.headers, timeout=20, verify=False)
             r.raise_for_status()
             return r.json()
         except Exception as e:

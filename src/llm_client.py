@@ -72,13 +72,16 @@ class LLMClient:
             payload["generationConfig"] = {"responseMimeType": "application/json"}
             
         try:
-            r = requests.post(url, json=payload, headers=headers, timeout=30, verify=False)
+            r = requests.post(url, json=payload, headers=headers, timeout=30)
             r.raise_for_status()
             res = r.json()
             text = res["candidates"][0]["content"]["parts"][0]["text"]
             return text.strip()
         except Exception as e:
-            logger.error(f"Gemini API çağrı hatası: {e}")
+            err_msg = str(e)
+            if api_key:
+                err_msg = err_msg.replace(api_key, "HIDDEN_KEY")
+            logger.error(f"Gemini API çağrı hatası: {err_msg}")
             return ""
 
     def _call_openai(self, api_key: str, model: str, base_url: str, prompt: str, json_response: bool) -> str:
@@ -96,13 +99,16 @@ class LLMClient:
             payload["response_format"] = {"type": "json_object"}
             
         try:
-            r = requests.post(url, json=payload, headers=headers, timeout=30, verify=False)
+            r = requests.post(url, json=payload, headers=headers, timeout=30)
             r.raise_for_status()
             res = r.json()
             text = res["choices"][0]["message"]["content"]
             return text.strip()
         except Exception as e:
-            logger.error(f"OpenAI/Uyumlu API çağrı hatası: {e}")
+            err_msg = str(e)
+            if api_key:
+                err_msg = err_msg.replace(api_key, "HIDDEN_KEY")
+            logger.error(f"OpenAI/Uyumlu API çağrı hatası: {err_msg}")
             return ""
 
     def _call_claude(self, api_key: str, model: str, prompt: str, json_response: bool) -> str:
@@ -124,11 +130,14 @@ class LLMClient:
             payload["system"] = system_instruction
             
         try:
-            r = requests.post(url, json=payload, headers=headers, timeout=30, verify=False)
+            r = requests.post(url, json=payload, headers=headers, timeout=30)
             r.raise_for_status()
             res = r.json()
             text = res["content"][0]["text"]
             return text.strip()
         except Exception as e:
-            logger.error(f"Claude API çağrı hatası: {e}")
+            err_msg = str(e)
+            if api_key:
+                err_msg = err_msg.replace(api_key, "HIDDEN_KEY")
+            logger.error(f"Claude API çağrı hatası: {err_msg}")
             return ""
