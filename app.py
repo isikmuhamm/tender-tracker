@@ -10,7 +10,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
-from src.database import init_db, get_db, Tender, User, get_data_path
+from src.database import init_db, get_db, Tender, User, get_data_path, turkish_lower
 from src.auth import verify_password, create_access_token, get_current_user
 from src.scheduler import TenderBotOrchestrator
 import datetime
@@ -240,12 +240,13 @@ def get_tenders(
     if source:
         query = query.filter_by(source=source)
     if search:
-        search_filter = f"%{search}%"
+        from sqlalchemy import func, or_
+        search_filter = f"%{turkish_lower(search)}%"
         query = query.filter(
             or_(
-                Tender.title.ilike(search_filter),
-                Tender.summary.ilike(search_filter),
-                Tender.category.ilike(search_filter)
+                func.turkish_lower(Tender.title).like(search_filter),
+                func.turkish_lower(Tender.summary).like(search_filter),
+                func.turkish_lower(Tender.category).like(search_filter)
             )
         )
         

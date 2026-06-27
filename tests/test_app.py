@@ -94,8 +94,8 @@ def test_tenders_endpoint_search(client, test_db):
     from src.database import Tender
     dummy = Tender(
         link="https://search-test.com",
-        title="Search Target Title",
-        summary="Search Target Summary Institution Name",
+        title="Search Target Title BORU HATLARI",
+        summary="Search Target Summary TEKİRDAĞ İhale",
         category="Yapım",
         source="ekapv2"
     )
@@ -112,8 +112,18 @@ def test_tenders_endpoint_search(client, test_db):
         assert len(data["items"]) >= 1
         assert any(item["link"] == "https://search-test.com" for item in data["items"])
         
+        # Test Turkish casing match: upper to lower (search term "boru hatları" matches "BORU HATLARI")
         response = client.get(
-            "/api/tenders?search=Institution",
+            "/api/tenders?search=boru%20hatları",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["items"]) >= 1
+        
+        # Test Turkish casing match: lower to upper (search term "tekirdağ" matches "TEKİRDAĞ")
+        response = client.get(
+            "/api/tenders?search=tekirdağ",
             headers={"Authorization": f"Bearer {token}"}
         )
         assert response.status_code == 200

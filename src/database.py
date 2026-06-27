@@ -23,6 +23,23 @@ if not db_url:
 else:
     DATABASE_URL = db_url
 
+def turkish_lower(val: str) -> str:
+    """Türkçe karakter uyumlu küçük harf dönüştürücü."""
+    if not val:
+        return ""
+    val_str = str(val)
+    val_str = val_str.replace("İ", "i").replace("I", "ı")
+    return val_str.lower()
+
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
+
+@event.listens_for(Engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    import sqlite3
+    if isinstance(dbapi_connection, sqlite3.Connection):
+        dbapi_connection.create_function("turkish_lower", 1, turkish_lower)
+
 Base = declarative_base()
 
 class User(Base):
