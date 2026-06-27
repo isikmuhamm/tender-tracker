@@ -265,6 +265,12 @@
                                     </div>
                                 </div>
                             </div>
+
+                            <div class="tab-actions">
+                                <button type="submit" class="btn-primary">
+                                    <i class="fa-solid fa-floppy-disk"></i> Ayarları Kaydet
+                                </button>
+                            </div>
                         </div>
 
                         <!-- Tab Content: Smart Filters -->
@@ -292,6 +298,11 @@
                                         <!-- Dynamic list rows -->
                                     </tbody>
                                 </table>
+                            </div>
+                            <div class="tab-actions">
+                                <button type="submit" class="btn-primary">
+                                    <i class="fa-solid fa-floppy-disk"></i> Ayarları Kaydet
+                                </button>
                             </div>
                         </div>
 
@@ -340,6 +351,11 @@
                                 <label for="cfg-telegram-chat">Kanal veya Grup Chat ID</label>
                                 <input type="text" id="cfg-telegram-chat" placeholder="-100123456789 veya kanal_id">
                             </div>
+                            <div class="tab-actions">
+                                <button type="submit" class="btn-primary">
+                                    <i class="fa-solid fa-floppy-disk"></i> Ayarları Kaydet
+                                </button>
+                            </div>
                         </div>
 
                         <!-- Tab Content: Sectors & Negative Keywords -->
@@ -357,6 +373,11 @@
                             <div class="sectors-accordion-list" id="sectors-accordion-container">
                                 <!-- Dynamic sector configurations -->
                             </div>
+                            <div class="tab-actions">
+                                <button type="submit" class="btn-primary">
+                                    <i class="fa-solid fa-floppy-disk"></i> Ayarları Kaydet
+                                </button>
+                            </div>
                         </div>
 
                         <!-- Tab Content: Security / Password change -->
@@ -364,23 +385,17 @@
                             <h3>Şifre Güncelleme</h3>
                             <div class="form-group">
                                 <label for="sec-old-pass">Mevcut Şifre</label>
-                                <input type="password" id="sec-old-pass" required autocomplete="current-password">
+                                <input type="password" id="sec-old-pass" autocomplete="current-password">
                             </div>
                             <div class="form-group">
                                 <label for="sec-new-pass">Yeni Şifre (En az 4 karakter)</label>
-                                <input type="password" id="sec-new-pass" required autocomplete="new-password">
+                                <input type="password" id="sec-new-pass" autocomplete="new-password">
                             </div>
                             <div class="form-group">
                                 <label for="sec-confirm-pass">Yeni Şifre Tekrar</label>
-                                <input type="password" id="sec-confirm-pass" required autocomplete="new-password">
+                                <input type="password" id="sec-confirm-pass" autocomplete="new-password">
                             </div>
                             <button type="button" id="btn-change-password" class="btn-secondary">Şifreyi Değiştir</button>
-                        </div>
-
-                        <div class="config-actions">
-                            <button type="submit" id="btn-save-config" class="btn-primary">
-                                <i class="fa-solid fa-floppy-disk"></i> Ayarları Kaydet
-                            </button>
                         </div>
                     </form>
                 </div>

@@ -125,20 +125,21 @@ body {
 .btn-primary {
     width: 100%;
     padding: 14px;
-    background: linear-gradient(135deg, #0ea5e9, #0284c7);
+    background: var(--primary-color);
     border: none;
     border-radius: 10px;
-    color: white;
+    color: #0b0f19;
     font-family: inherit;
-    font-weight: 600;
+    font-weight: 700;
     font-size: 15px;
     cursor: pointer;
-    transition: transform 0.2s, opacity 0.2s;
+    transition: all 0.2s;
 }
 
 .btn-primary:hover {
     opacity: 0.95;
     transform: translateY(-1px);
+    box-shadow: 0 4px 12px var(--primary-glow);
 }
 
 .btn-primary:active {
@@ -901,6 +902,17 @@ input:checked + .slider:before {
 
 .btn-icon-red:hover {
     color: #f87171;
+}
+
+.tab-actions {
+    margin-top: 20px;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.tab-actions .btn-primary {
+    width: auto;
+    padding: 10px 24px;
 }
 
 /* Sectors Accordion */

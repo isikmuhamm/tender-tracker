@@ -1170,8 +1170,9 @@ document.addEventListener("DOMContentLoaded", () => {
     // =========================================================
     // INITIALIZATION & UTIL
     // =========================================================
-    function initApp() {
+    async function initApp() {
         populateSourcesFilter();
+        await loadConfigFromServer();
         handleRouting();
     }
 
