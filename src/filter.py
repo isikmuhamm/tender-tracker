@@ -21,8 +21,11 @@ class TenderFilter:
         try:
             with open(self.config_path, "r", encoding="utf-8") as f:
                 config = yaml.safe_load(f)
-                if config and "global_filters" in config:
-                    self.exclude_keywords = config["global_filters"].get("exclude_keywords", [])
+                if config:
+                    if "filters" in config:
+                        self.exclude_keywords = config["filters"].get("exclude_keywords", [])
+                    elif "global_filters" in config:
+                        self.exclude_keywords = config["global_filters"].get("exclude_keywords", [])
             logger.info(f"Küresel filtreler yüklendi. {len(self.exclude_keywords)} adet dışlama kelimesi tanımlı.")
         except Exception as e:
             logger.error(f"Filtre yapılandırması yüklenirken hata: {e}")

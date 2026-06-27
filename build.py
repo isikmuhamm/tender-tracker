@@ -39,6 +39,8 @@ def build():
         "--hidden-import=uvicorn.lifespan.off",
         "--hidden-import=bcrypt",
         "--hidden-import=sqlite3",
+        "--hidden-import=pystray",
+        "--hidden-import=PIL",
     ]
     
     print(f"PyInstaller şu parametrelerle çalıştırılıyor: {' '.join(args)}")

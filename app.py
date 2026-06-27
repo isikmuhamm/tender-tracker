@@ -392,6 +392,15 @@ if __name__ == "__main__":
             
     threading.Thread(target=open_browser, daemon=True).start()
     
+    # Sistem tepsisi (system tray) simgesini arka planda başlat (yalnızca Windows)
+    if sys.platform.startswith("win"):
+        try:
+            from src.tray import SystemTrayManager
+            tray_mgr = SystemTrayManager(port=port, host=host)
+            threading.Thread(target=tray_mgr.run, daemon=True).start()
+        except Exception as e:
+            print(f"Sistem tepsisi simgesi başlatılamadı: {e}")
+            
     print(f"Sunucu başlatılıyor: http://{host}:{port}/")
     uvicorn.run(app, host=host, port=port)
 
