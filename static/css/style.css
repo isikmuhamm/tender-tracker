@@ -282,17 +282,15 @@ header h1 {
 }
 
 #btn-trigger {
-    background: var(--primary-glow);
+    background: transparent;
     border: 1px solid var(--primary-color);
     color: var(--primary-color);
-    box-shadow: 0 0 10px var(--primary-glow);
-    font-weight: 600;
+    font-weight: 500;
 }
 
 #btn-trigger:hover {
-    background: var(--primary-color);
-    color: #0b0f19;
-    box-shadow: 0 0 15px var(--primary-color);
+    background: var(--primary-glow);
+    color: var(--primary-color);
 }
 
 @keyframes spin {
