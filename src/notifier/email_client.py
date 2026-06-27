@@ -122,8 +122,9 @@ class EmailNotifier(BaseNotifier):
 
             body += """
                 <br><br>
-                <div style="border-top: 1px solid #ccc; padding-top: 15px; margin-top: 30px; font-size: 11px; color: #777;">
+                <div style="border-top: 1px solid #ccc; padding-top: 15px; margin-top: 30px; font-size: 11px; color: #777; text-align: center;">
                     <p>Bu e-posta, İhale Takip Botu tarafından otomatik olarak üretilmiştir.</p>
+                    <p><a href="https://github.com/isikmuhamm/tender-tracker" style="color: #007bff; text-decoration: none; font-weight: bold;">GitHub Deposu</a></p>
                 </div>
             </body>
             </html>
