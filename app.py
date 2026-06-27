@@ -384,6 +384,8 @@ if __name__ == "__main__":
     host = os.getenv("HOST", "127.0.0.1")
     
     def open_browser():
+        if os.getenv("NO_BROWSER") == "true":
+            return
         time.sleep(1.5)
         try:
             webbrowser.open(f"http://{host}:{port}/")
