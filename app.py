@@ -565,6 +565,59 @@ def catch_all(catchall: str):
 init_db()
 
 if __name__ == "__main__":
+    import sys
+    # Check CLI arguments for Task Scheduler/command-line compatibility
+    if len(sys.argv) > 1:
+        arg = sys.argv[1]
+        if arg in ["--once", "/once"]:
+            logger.info("=" * 60)
+            logger.info("İHALE TAKİP BOTU - TEK SEFERLİK ÇALIŞTIRMA MODU")
+            logger.info("=" * 60)
+            from src.process_lock import ProcessLock
+            lock = ProcessLock("scan")
+            if not lock.acquire():
+                logger.error("Hata: Başka bir tarama veya re-evaluation işlemi çalışıyor. Çıkılıyor.")
+                sys.exit(1)
+            try:
+                from src.scheduler import TenderBotOrchestrator
+                orchestrator = TenderBotOrchestrator()
+                orchestrator.run_once()
+            finally:
+                lock.release()
+            sys.exit(0)
+            
+        elif arg in ["--stats", "/stats"]:
+            from src.database import SessionLocal, Tender
+            db = SessionLocal()
+            try:
+                total = db.query(Tender).count()
+                excluded = db.query(Tender).filter_by(sector="Excluded").count()
+                classified = total - excluded
+                print("=" * 60)
+                print("İHALE TAKİP BOTU - VERİTABANI İSTATİSTİKLERİ")
+                print("=" * 60)
+                print(f"Toplam Taranan İhale: {total}")
+                print(f"Elenen İhale (Küresel Filtre): {excluded}")
+                print(f"Sınıflandırılan Aktif İhale: {classified}")
+                print("-" * 60)
+                sectors = db.query(Tender.sector).filter(Tender.sector != "Excluded", Tender.sector != None).distinct().all()
+                print("Sektörel Dağılım:")
+                for (sec,) in sectors:
+                    count = db.query(Tender).filter_by(sector=sec).count()
+                    print(f"  - {sec}: {count} ihale")
+                print("-" * 60)
+                sources = db.query(Tender.source).distinct().all()
+                print("Kaynak Dağılımı:")
+                for (src,) in sources:
+                    count = db.query(Tender).filter_by(source=src).count()
+                    print(f"  - {src}: {count} ihale")
+                print("=" * 60)
+            except Exception as e:
+                print(f"İstatistikler alınırken hata: {e}")
+            finally:
+                db.close()
+            sys.exit(0)
+            
     import uvicorn
     import webbrowser
     import time
