@@ -58,7 +58,13 @@ def show_stats():
     try:
         total = db.query(Tender).count()
         excluded = db.query(Tender).filter_by(sector="Excluded").count()
-        classified = total - excluded
+        classified = db.query(Tender).filter(
+            Tender.sector.isnot(None),
+            Tender.sector != "Excluded"
+        ).count()
+        unclassified = db.query(Tender).filter(
+            Tender.sector.is_(None)
+        ).count()
         
         # Sektör dağılımı
         print("=" * 60)
@@ -67,6 +73,7 @@ def show_stats():
         print(f"Toplam Taranan İhale: {total}")
         print(f"Elenen İhale (Küresel Filtre): {excluded}")
         print(f"Sınıflandırılan Aktif İhale: {classified}")
+        print(f"Sektör Atanamayan İhale (Unclassified): {unclassified}")
         print("-" * 60)
         
         sectors = db.query(Tender.sector).filter(Tender.sector != "Excluded", Tender.sector != None).distinct().all()
@@ -85,6 +92,7 @@ def show_stats():
         
     except Exception as e:
         logger.error(f"İstatistikler alınırken hata: {e}")
+        sys.exit(1)
     finally:
         db.close()
 
@@ -125,7 +133,7 @@ def main():
 
     if args.stats:
         show_stats()
-        return
+        sys.exit(0)
 
     orchestrator = TenderBotOrchestrator()
 
@@ -139,7 +147,17 @@ def main():
             logger.error("Hata: Başka bir tarama veya re-evaluation işlemi (örneğin Dashboard) çalışıyor. Çıkılıyor.")
             sys.exit(1)
         try:
-            orchestrator.run_once()
+            result = orchestrator.run_once()
+            status_str = result.get("status", "success")
+            if status_str == "success":
+                sys.exit(0)
+            elif status_str == "partial":
+                sys.exit(2)
+            else:
+                sys.exit(1)
+        except Exception as err:
+            logger.error(f"Tek seferlik taramada hata: {err}")
+            sys.exit(1)
         finally:
             lock.release()
         return

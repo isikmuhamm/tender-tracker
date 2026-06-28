@@ -437,4 +437,19 @@ Scrapers now share a case-insensitive, standardized contract normalization layer
 ### Architectural Result
 The compiled Windows binary `tender-tracker.exe` is now fully dual-purpose: it runs as a graphical dashboard and system tray application by default, and as a headless command-line crawler when passed CLI flags (supporting Task Scheduler integration). Search, pagination, and custom filters have been moved to the SQL layer to support large-scale performance.
 
+---
+
+## H-018 CLI Hardening, Exact Token Match, and Stats Count Updates
+
+**Date:** 2026-06-28
+
+### Delivered
+- **CLI Exit Codes:** Returned `0` for success, `2` for partial failures, and `1` for exceptions/critical failures on the `--once` CLI run cycle. Returned `1` on stats check exceptions.
+- **Exact Token Custom Filter SQL Matching:** Updated custom filter search to wrap `matched_custom_filters` in commas and query using `func.instr(wrapped, f",filter,") > 0`. This guarantees exact matches, preventing substring collisions.
+- **Precision Stats Counts:** Correctly queries and separates classified vs unclassified counts in database stats reports.
+- **SystemExit Test Coverage:** Updated CLI tests to assert on code exits and expect return status dictionaries.
+
+### Architectural Result
+CLI execution robustness is fully hardened, providing clean integration flags and exit codes for enterprise and scheduler orchestrators. Custom filter searches are fully correct, resolving partial substring matches.
+
 

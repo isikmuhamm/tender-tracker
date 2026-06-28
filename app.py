@@ -65,7 +65,7 @@ if not any(isinstance(h, logging.StreamHandler) and not isinstance(h, logging.Fi
     console_handler.setLevel(logging.INFO)
     logger.addHandler(console_handler)
 
-app = FastAPI(title="Tender Tracker API", version="1.3.1")
+app = FastAPI(title="Tender Tracker API", version="1.3.2")
 
 def run_startup_scan():
     """Uygulama başladığında otomatik taramayı arka planda başlatır."""
@@ -248,8 +248,15 @@ def get_tenders(
     if source:
         query = query.filter_by(source=source)
     if custom_filter:
-        filter_pattern = f"%{custom_filter}%"
-        query = query.filter(Tender.matched_custom_filters.like(filter_pattern))
+        from sqlalchemy import func, literal
+        wrapped_filters = (
+            literal(",")
+            + func.coalesce(Tender.matched_custom_filters, "")
+            + literal(",")
+        )
+        query = query.filter(
+            func.instr(wrapped_filters, f",{custom_filter},") > 0
+        )
     if search:
         from sqlalchemy import func, or_
         search_filter = f"%{turkish_lower(search)}%"
@@ -581,10 +588,19 @@ if __name__ == "__main__":
             try:
                 from src.scheduler import TenderBotOrchestrator
                 orchestrator = TenderBotOrchestrator()
-                orchestrator.run_once()
+                result = orchestrator.run_once()
+                status_str = result.get("status", "success")
+                if status_str == "success":
+                    sys.exit(0)
+                elif status_str == "partial":
+                    sys.exit(2)
+                else:
+                    sys.exit(1)
+            except Exception as err:
+                logger.error(f"Tek seferlik taramada hata: {err}")
+                sys.exit(1)
             finally:
                 lock.release()
-            sys.exit(0)
             
         elif arg in ["--stats", "/stats"]:
             from src.database import SessionLocal, Tender
@@ -592,13 +608,21 @@ if __name__ == "__main__":
             try:
                 total = db.query(Tender).count()
                 excluded = db.query(Tender).filter_by(sector="Excluded").count()
-                classified = total - excluded
+                classified = db.query(Tender).filter(
+                    Tender.sector.isnot(None),
+                    Tender.sector != "Excluded"
+                ).count()
+                unclassified = db.query(Tender).filter(
+                    Tender.sector.is_(None)
+                ).count()
+                
                 print("=" * 60)
                 print("İHALE TAKİP BOTU - VERİTABANI İSTATİSTİKLERİ")
                 print("=" * 60)
                 print(f"Toplam Taranan İhale: {total}")
                 print(f"Elenen İhale (Küresel Filtre): {excluded}")
                 print(f"Sınıflandırılan Aktif İhale: {classified}")
+                print(f"Sektör Atanamayan İhale (Unclassified): {unclassified}")
                 print("-" * 60)
                 sectors = db.query(Tender.sector).filter(Tender.sector != "Excluded", Tender.sector != None).distinct().all()
                 print("Sektörel Dağılım:")
@@ -612,11 +636,12 @@ if __name__ == "__main__":
                     count = db.query(Tender).filter_by(source=src).count()
                     print(f"  - {src}: {count} ihale")
                 print("=" * 60)
+                sys.exit(0)
             except Exception as e:
                 print(f"İstatistikler alınırken hata: {e}")
+                sys.exit(1)
             finally:
                 db.close()
-            sys.exit(0)
             
     import uvicorn
     import webbrowser

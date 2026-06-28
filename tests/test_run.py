@@ -61,9 +61,12 @@ def test_main_once(mock_parse, mock_orch_class):
     mock_parse.return_value = mock_args
     
     mock_orch = MagicMock()
+    mock_orch.run_once.return_value = {"status": "success"}
     mock_orch_class.return_value = mock_orch
     
-    main()
+    with pytest.raises(SystemExit) as excinfo:
+        main()
+    assert excinfo.value.code == 0
     mock_orch.run_once.assert_called_once()
 
 @patch("run.show_stats")
@@ -75,7 +78,9 @@ def test_main_stats(mock_parse, mock_show_stats):
     mock_args.daemon = False
     mock_parse.return_value = mock_args
     
-    main()
+    with pytest.raises(SystemExit) as excinfo:
+        main()
+    assert excinfo.value.code == 0
     mock_show_stats.assert_called_once()
 
 @patch("run.time.sleep", side_effect=KeyboardInterrupt)

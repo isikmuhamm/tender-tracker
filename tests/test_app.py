@@ -131,7 +131,7 @@ def test_tenders_endpoint_search(client, test_db):
         data = response.json()
         assert len(data["items"]) >= 1
         
-        # Test custom_filter query
+        # Test custom_filter query (exact match)
         response = client.get(
             "/api/tenders?custom_filter=metro_plc",
             headers={"Authorization": f"Bearer {token}"}
@@ -141,9 +141,18 @@ def test_tenders_endpoint_search(client, test_db):
         assert len(data["items"]) >= 1
         assert any(item["link"] == "https://search-test.com" for item in data["items"])
         
-        # Test custom_filter query (no matches)
+        # Test custom_filter query (substring check: 'plc' should not match 'metro_plc')
         response = client.get(
-            "/api/tenders?custom_filter=not_exist_filter",
+            "/api/tenders?custom_filter=plc",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["items"]) == 0
+        
+        # Test custom_filter query (prefix check: 'metro_plc_old' should not match 'metro_plc')
+        response = client.get(
+            "/api/tenders?custom_filter=metro_plc_old",
             headers={"Authorization": f"Bearer {token}"}
         )
         assert response.status_code == 200

@@ -219,3 +219,6 @@ Detailed rationale and architecture hypotheses live in `NOTES.md`, Records 026�
 
 ### C-015 Turkish Search, Pagination, Brand Icon, and Task Scheduler Support
 **Status:** Completed — case-insensitive Turkish search, pagination, custom filter backend queries, Task Scheduler CLI support, and model settings placeholder bug fixes.
+
+### C-016 CLI Hardening, Exact Token Match, and Stats Count Updates
+**Status:** Completed — status-specific CLI exit codes for Task Scheduler, exact custom filter token matches, and exact statistics reporting.
