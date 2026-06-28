@@ -82,10 +82,7 @@ Global exclusion rules and sector keyword rules are evaluated before optional LL
 
 #### 4. Optional Semantic Filtering
 
-Gemini, OpenAI-compatible providers, and Anthropic Claude can be configured by the user. LLM use is optional and can serve two distinct purposes:
-
-- fallback sector classification when deterministic sector rules do not match;
-- user-defined semantic filters scoped to one sector or all sectors.
+Gemini, OpenAI-compatible providers, and Anthropic Claude can be configured by the user. LLM use is optional and is used for user-defined semantic filters scoped to one sector or all sectors.
 
 #### 5. Portable Product Surface
 
@@ -121,7 +118,6 @@ Critical hardening work is tracked in [`business/BOARD.md`](business/BOARD.md); 
 - global exclusion keywords;
 - sector-specific positive and negative keywords;
 - local deterministic sector assignment;
-- optional fallback LLM classification;
 - custom LLM filters targeted to selected sectors;
 - stored-tender re-evaluation for custom LLM prompt changes.
 
@@ -172,10 +168,7 @@ flowchart LR
     D -->|Yes| E[(Store as Excluded)]
     D -->|No| F[Local Sector Rules]
     F -->|Matched| H[Sector Assigned]
-    F -->|No Match| G{LLM Enabled?}
-    G -->|Yes| I[Fallback LLM Classification]
-    G -->|No| J[Unclassified]
-    I --> H
+    F -->|No Match| J[Unclassified]
     H --> K[Sector-Scoped Custom LLM Filters]
     K --> L[(SQLite)]
     J --> L
@@ -191,7 +184,6 @@ source ingestion
 → normalization and duplicate check
 → global exclusions
 → deterministic sector classification
-→ optional fallback LLM sector classification
 → optional sector-scoped custom LLM filters
 → SQLite persistence
 → dashboard / email / Telegram

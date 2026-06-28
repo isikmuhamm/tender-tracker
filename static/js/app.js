@@ -777,14 +777,14 @@ document.addEventListener("DOMContentLoaded", () => {
         // Providers keys & models
         const providers = settings.llm_providers || {};
         cfgGeminiKey.value = providers.gemini?.api_key || "";
-        await loadLlmModels("gemini", cfgGeminiModel, providers.gemini?.model || "gemini-1.5-flash", providers.gemini?.api_key);
+        await loadLlmModels("gemini", cfgGeminiModel, providers.gemini?.model || "", providers.gemini?.api_key);
         
         cfgOpenaiKey.value = providers.openai?.api_key || "";
         cfgOpenaiUrl.value = providers.openai?.base_url || "https://api.openai.com/v1";
-        await loadLlmModels("openai", cfgOpenaiModel, providers.openai?.model || "gpt-4o-mini", providers.openai?.api_key);
+        await loadLlmModels("openai", cfgOpenaiModel, providers.openai?.model || "", providers.openai?.api_key, cfgOpenaiUrl.value.trim());
         
         cfgClaudeKey.value = providers.claude?.api_key || "";
-        await loadLlmModels("claude", cfgClaudeModel, providers.claude?.model || "claude-3-5-sonnet-20241022", providers.claude?.api_key);
+        await loadLlmModels("claude", cfgClaudeModel, providers.claude?.model || "", providers.claude?.api_key);
         
         // SMTP & Telegram
         cfgSmtpServer.value = email.smtp_server || "";
