@@ -416,5 +416,25 @@ Incremental and initial synchronization behavior for EKAP is robustly tied to lo
 - **Windows Executable Smokes:** Compiled `dist/tender-tracker.exe` using `build.py` and validated startup behavior using `smoke_check_exe.py` successfully.
 
 ### Architectural Result
-Scrapers now share a single strict normalization and contract safety layer, making it impossible to store malformed records. Watermark progress is strictly tied to successful database commits, making ingestion completely transactional.
+Scrapers now share a case-insensitive, standardized contract normalization layer. Watermark progress is strictly tied to successful database commits, making ingestion completely transactional.
+
+---
+
+## H-017 Turkish Search, Pagination, Brand Icon, and Task Scheduler Support
+
+**Date:** 2026-06-28
+
+### Delivered
+- **Turkish Case-Insensitive Search:** Registered a custom `turkish_lower` collation/function in SQLite and applied it globally to the `/api/tenders` endpoint, enabling case-insensitive search queries containing Turkish characters.
+- **Client-Side Pagination & Stats:** Replaced the hard-coded 100 limit in the UI with a "Load More" pagination button and updated stats text format to `"Toplam X ihaleden Y ihale gösteriliyor"` to improve clarity.
+- **Server-Side Custom LLM Filtering:** Moved custom LLM filter queries to the SQLite backend using `LIKE %filter%` on the `matched_custom_filters` column. This provides instant global searches across thousands of entries and integrates with the pagination engine.
+- **EKAPv2 Start Date Format Correction:** Fixed 400 Bad Request API errors by sending announcements start date parameter formatted as ISO 8601 (`"%Y-%m-%dT%H:%M:%S"`) instead of `"dd.mm.yyyy"`.
+- **OpenAI Configuration Layout Redesign:** Reordered input fields as **API Key -> Base URL -> Model Name**, cleared default fallback models when key fields are empty, and supported on-the-fly model list updates using input field states.
+- **Brand Icon & Favicon Integration:** Designed a custom modern magnifying glass logo, converted it into multi-resolution `.ico` formats, updated `build.py` with `--icon=app_icon.ico`, and mounted it at `/favicon.ico` in the backend.
+- **CLI Executable Task Scheduler support:** Enabled CLI argument parsing (`--once`, `--stats`) directly inside `app.py` so that the compiled `tender-tracker.exe` can run headlessly via Windows Task Scheduler.
+- **AI Fallback Classification Removal:** Removed the optional AI fallback classification path to conserve tokens and reduce costs, and updated README/Notes/Board to align with deterministic-only sector mapping.
+
+### Architectural Result
+The compiled Windows binary `tender-tracker.exe` is now fully dual-purpose: it runs as a graphical dashboard and system tray application by default, and as a headless command-line crawler when passed CLI flags (supporting Task Scheduler integration). Search, pagination, and custom filters have been moved to the SQL layer to support large-scale performance.
+
 

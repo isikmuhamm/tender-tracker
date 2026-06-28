@@ -73,7 +73,7 @@ events.log       local operational log
 | ilan.gov.tr | Operational | JSON endpoint adapter implemented |
 | EKAPv2 | Operational | JSON signed API adapter and public record parser implemented |
 | Global exclusions | Operational | Editable local negative keyword rules |
-| Sector classification | Operational | Local rules first, optional LLM fallback |
+| Sector classification | Operational | Deterministic local rules only (AI fallback removed) |
 | Custom LLM filters | Operational | Sector-scoped and re-evaluable against stored tenders |
 | FastAPI dashboard | Operational | Setup, login, tenders, configuration, logs |
 | Email / Telegram | Operational when configured | Optional local notification channels |
@@ -216,3 +216,6 @@ Detailed rationale and architecture hypotheses live in `NOTES.md`, Records 026�
 
 ### C-014 Supported Runtime Path Consistency (P0.7)
 **Status:** Completed — resolved daemon CLI imports, integrated precedence resolution (ENV > config.yaml > defaults), and wrapped daemon runs in Ctrl+C KeyboardInterrupt handlers.
+
+### C-015 Turkish Search, Pagination, Brand Icon, and Task Scheduler Support
+**Status:** Completed — case-insensitive Turkish search, pagination, custom filter backend queries, Task Scheduler CLI support, and model settings placeholder bug fixes.

@@ -104,16 +104,15 @@ The system is more accurately described as a staged hybrid pipeline than a simpl
 2. Duplicate check
 3. Global exclusion rules
 4. Local sector classification
-5. Optional fallback LLM sector classification
-6. Sector-scoped custom LLM filters
-7. Database persistence
-8. Optional notification delivery
+5. Sector-scoped custom LLM filters
+6. Database persistence
+7. Optional notification delivery
 ```
 
 Key distinction:
 
 - local sector classification determines a sector cheaply and deterministically;
-- fallback LLM classification is used only when local rules do not identify a sector and an LLM is enabled;
+- fallback LLM classification has been removed to conserve tokens and reduce costs;
 - custom LLM filters are a separate user-defined semantic evaluation after a sector is known;
 - database re-evaluation currently targets custom LLM filters for already stored, sector-assigned tenders. It is not a complete re-scrape or full sector reclassification.
 
@@ -122,7 +121,7 @@ Reasons:
 - deterministic rules are faster and explainable;
 - LLM calls remain optional and targeted;
 - custom filters can evolve without repeating external network ingestion;
-- the separation supports future measurement of rule hits, fallback classification, and custom-filter matches.
+- the separation supports future measurement of rule hits and custom-filter matches.
 
 **Status:** Accepted; public diagrams should use this sequence.
 
@@ -631,7 +630,6 @@ Restarting or recreating the runtime object remains acceptable in the current ex
 Future telemetry may record:
 
 - local-rule match rate;
-- LLM fallback-call count;
 - custom-filter-call count;
 - provider latency and failure rate;
 - input/output tokens where providers report them;
