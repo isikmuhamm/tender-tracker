@@ -501,6 +501,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (sector) url += `&sector=${encodeURIComponent(sector)}`;
         if (source) url += `&source=${encodeURIComponent(source)}`;
         if (search) url += `&search=${encodeURIComponent(search)}`;
+        if (customFilterVal) url += `&custom_filter=${encodeURIComponent(customFilterVal)}`;
         
         const response = await apiRequest(url);
         if (!response || !response.ok) return;
@@ -515,14 +516,7 @@ document.addEventListener("DOMContentLoaded", () => {
             loadedTendersList = [...loadedTendersList, ...data.items];
         }
         
-        // Client-side Custom LLM Filter
-        let itemsToRender = loadedTendersList;
-        if (customFilterVal) {
-            itemsToRender = loadedTendersList.filter(t => 
-                t.matched_custom_filters && 
-                t.matched_custom_filters.split(",").includes(customFilterVal)
-            );
-        }
+        const itemsToRender = loadedTendersList;
         
         if (data.total > itemsToRender.length) {
             tenderStatsContent.innerHTML = `Toplam <strong>${data.total}</strong> ihaleden <strong>${itemsToRender.length}</strong> ihale gösteriliyor.`;

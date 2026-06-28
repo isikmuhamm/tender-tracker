@@ -234,6 +234,7 @@ def get_tenders(
     sector: str = None,
     source: str = None,
     search: str = None,
+    custom_filter: str = None,
     limit: int = 50,
     offset: int = 0,
     db: Session = Depends(get_db),
@@ -246,6 +247,9 @@ def get_tenders(
         query = query.filter_by(sector=sector)
     if source:
         query = query.filter_by(source=source)
+    if custom_filter:
+        filter_pattern = f"%{custom_filter}%"
+        query = query.filter(Tender.matched_custom_filters.like(filter_pattern))
     if search:
         from sqlalchemy import func, or_
         search_filter = f"%{turkish_lower(search)}%"

@@ -97,7 +97,8 @@ def test_tenders_endpoint_search(client, test_db):
         title="Search Target Title BORU HATLARI",
         summary="Search Target Summary TEKİRDAĞ İhale",
         category="Yapım",
-        source="ekapv2"
+        source="ekapv2",
+        matched_custom_filters="metro_plc,boji_alimi"
     )
     test_db.add(dummy)
     test_db.commit()
@@ -129,6 +130,25 @@ def test_tenders_endpoint_search(client, test_db):
         assert response.status_code == 200
         data = response.json()
         assert len(data["items"]) >= 1
+        
+        # Test custom_filter query
+        response = client.get(
+            "/api/tenders?custom_filter=metro_plc",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["items"]) >= 1
+        assert any(item["link"] == "https://search-test.com" for item in data["items"])
+        
+        # Test custom_filter query (no matches)
+        response = client.get(
+            "/api/tenders?custom_filter=not_exist_filter",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["items"]) == 0
     finally:
         test_db.query(Tender).filter_by(link="https://search-test.com").delete()
         test_db.commit()
