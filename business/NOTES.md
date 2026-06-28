@@ -437,8 +437,8 @@ The following items are intentionally **not active board blockers**. They are us
 | D-020 | Docker/Compose on-premises deployment profile | Supports repeatable always-on customer deployment after a real server-use case exists |
 | D-021 | License and entitlement architecture | Needed for paid distribution; must support offline/on-premises recovery and must not be confused with application security |
 | D-022 | Managed-cloud tenancy and control plane | Required only for a hosted multi-customer service with explicit operational ownership |
-| D-023 | Opt-in tender record synchronization | Potential shared intelligence layer; requires provenance, validation, consent, and abuse controls |
 | D-024 | Formal threat model and security review | Required before non-local, licensed, on-premises, or cloud service claims |
+| D-025 | Smart filter notification toggle (only notify smart filter matches) | Restricts email/telegram alerts to LLM filter hits; not requested by default |
 
 ---
 
