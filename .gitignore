@@ -9,7 +9,7 @@ __pycache__/
 *.db
 *.log
 .env
-*.lock
+tender_tracker_*.lock
 
 # IDE configurations
 .idea/

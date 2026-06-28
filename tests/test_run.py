@@ -51,9 +51,13 @@ def test_show_stats(mock_init, mock_session_class):
     show_stats()
     mock_session.close.assert_called_once()
 
+@pytest.mark.parametrize(
+    ("status", "expected_code"),
+    [("success", 0), ("partial", 2), ("failed", 1)],
+)
 @patch("run.TenderBotOrchestrator")
 @patch("run.parse_arguments")
-def test_main_once(mock_parse, mock_orch_class):
+def test_main_once(mock_parse, mock_orch_class, status, expected_code):
     mock_args = MagicMock()
     mock_args.once = True
     mock_args.stats = False
@@ -61,12 +65,12 @@ def test_main_once(mock_parse, mock_orch_class):
     mock_parse.return_value = mock_args
     
     mock_orch = MagicMock()
-    mock_orch.run_once.return_value = {"status": "success"}
+    mock_orch.run_once.return_value = {"status": status}
     mock_orch_class.return_value = mock_orch
     
     with pytest.raises(SystemExit) as excinfo:
         main()
-    assert excinfo.value.code == 0
+    assert excinfo.value.code == expected_code
     mock_orch.run_once.assert_called_once()
 
 @patch("run.show_stats")
