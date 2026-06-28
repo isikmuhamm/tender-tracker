@@ -160,7 +160,7 @@ Provider use is optional. The application remains functional with local rules on
 ## Processing Pipeline
 
 ```mermaid
-flowchart LR
+flowchart TD
     A[Public Tender Sources] --> B[Source Adapters]
     B --> C{Already Stored?}
     C -->|Yes| X[Skip Duplicate]
@@ -172,12 +172,18 @@ flowchart LR
     H --> K[Sector-Scoped Custom LLM Filters]
     K --> L[(SQLite)]
     J --> L
-    L --> M[Dashboard]
-    L --> N[Email]
-    L --> O[Telegram]
+    L --> M[Dashboard (All Tenders)]
+    L --> N{Has Sector & Not Excluded?}
+    N -->|Yes| O[Optional Notifications<br/>(Email & Telegram)]
+    N -->|No| P[Dashboard Only]
 ```
 
-The practical order is:
+The processing contract follows these rules:
+- **Unclassified Tenders:** Tenders that do not match any positive local sector rules are stored in the database and shown on the dashboard only. They do not trigger LLM calls or send notifications.
+- **Custom LLM Filters:** User-defined semantic filters run only on tenders that have been successfully mapped to a sector via local rules.
+- **Notifications:** Email and Telegram notifications are dispatched only for records that are mapped to a valid sector and are not marked as `Excluded` (no notifications are sent for unclassified or excluded tenders).
+
+The practical execution order is:
 
 ```text
 source ingestion
@@ -186,7 +192,7 @@ source ingestion
 → deterministic sector classification
 → optional sector-scoped custom LLM filters
 → SQLite persistence
-→ dashboard / email / Telegram
+→ dashboard / email / Telegram (filtered by sector presence)
 ```
 
 No fixed token-saving percentage is claimed. Actual savings depend on source volume, rule coverage, selected sectors, prompt design, and provider behavior.
@@ -195,12 +201,12 @@ No fixed token-saving percentage is claimed. Actual savings depend on source vol
 
 ## Supported Sources
 
-| Source | Integration | Current Status |
-|---|---|---|
-| **Yatırımlar Dergisi** | HTML parsing | Operational |
-| **Devlet Malzeme Ofisi (DMO)** | Active tender-list HTML parsing | Operational |
-| **ilan.gov.tr** | Public JSON request | Operational |
-| **EKAPv2** | Signed JSON API request | Operational |
+| Source | Integration | Sync Strategy | Current Status |
+|---|---|---|---|
+| **Yatırımlar Dergisi** | HTML parsing | Snapshot of current homepage | Operational |
+| **Devlet Malzeme Ofisi (DMO)** | HTML parsing | Current active listings parser | Operational |
+| **ilan.gov.tr** | JSON API | Paged request of current listings | Operational |
+| **EKAPv2** | Signed JSON API | Initial crawl of open tenders, then stateful incremental sync | Operational |
 
 ### EKAP Scope
 
@@ -226,7 +232,7 @@ flowchart TD
 
     subgraph Core["⚙️ Application Services"]
         Orchestrator["Scheduler & Orchestrator"]
-        Classifier["Rule & AI Classifier"]
+        Classifier["Deterministic Sector Classifier<br/>& Custom LLM Filters"]
         LLMClient["LLM Provider Client"]
     end
 
@@ -262,7 +268,7 @@ tender-tracker/
 ├── src/
 │   ├── scraper/              # Source-specific adapters
 │   ├── notifier/             # Email and Telegram adapters
-│   ├── classifier.py         # Deterministic and LLM classification
+│   ├── classifier.py         # Local sector rules and custom LLM filter evaluation
 │   ├── database.py           # SQLite and SQLAlchemy models
 │   ├── filter.py             # Exclusion and sector rules
 │   ├── llm_client.py         # Provider abstraction
@@ -332,22 +338,31 @@ python app.py
 
 Open `http://127.0.0.1:8000` if the browser does not open automatically.
 
-### Command-Line Utilities
+### Command-Line Utilities & Windows Task Scheduler
 
-```bash
-# Run one ingestion cycle and exit (default when run without arguments)
-python run.py --once
+The compiled executable `tender-tracker.exe` (or the Python script `run.py`) can be executed directly as a command-line tool. This allows headless execution, perfect for setting up a daily automated task in **Windows Task Scheduler**.
 
-# Run continuously as a background daemon polling at regular intervals
-python run.py --daemon
+#### Supported CLI Arguments:
+* `--once`: Runs a single ingestion cycle (fetches new tenders, saves them, sends notifications) and exits.
+  * **Exit Codes:** `0` on complete success, `2` on partial success (some scrapers or notifiers failed), and `1` on exceptions or critical failures.
+* `--stats`: Prints the current local database statistics (total scanned, excluded, classified, unclassified, and distribution per sector/source) and exits immediately with code `0` (or `1` on error).
+* `--daemon`: Runs continuously as a background process, sleeping and running scans at the configured interval (for Python execution).
 
-# Display local database statistics
-python run.py --stats
-```
+#### Windows Task Scheduler Configuration:
+To set up a daily automatic scan task using the Windows Task Scheduler:
+1. Create a new **Basic Task** and set the trigger to daily (e.g., 9:00 AM).
+2. Set the action to **Start a Program**.
+3. In **Program/script**, specify the absolute path to the compiled executable:
+   `C:\path\to\tender-tracker.exe`
+4. In **Add arguments (optional)**, enter:
+   `--once`
+5. In **Start in (optional)**, enter the directory containing the executable (e.g., `C:\path\to\`). **IMPORTANT:** If you omit this, the program will not be able to find the configuration and database files (`config.yaml`, `sectors.yaml`, `tenders.db`), causing it to start with fresh, empty files.
 
-The dashboard (via `python app.py`) and CLI (via `python run.py`) are separate entry paths. Interval-based daemon execution exists as a CLI execution mode. Read the current board before changing scheduler or packaging behavior.
+---
 
-### Build The Windows Executable
+### Build & Update The Windows Executable
+
+To compile the single portable Windows executable yourself, run:
 
 ```bash
 python build.py
@@ -358,6 +373,9 @@ The generated file is written to:
 ```text
 dist/tender-tracker.exe
 ```
+
+> [!WARNING]
+> **Giriş ve Veri Kaybı Uyarısı (Backup Warning):** Yeni bir EXE sürümüne geçmeden önce, mevcut klasördeki yerel veritabanı (`tenders.db`) ve yapılandırma (`config.yaml`, `sectors.yaml`) dosyalarınızın **mutlaka yedeğini alın**. Yeni çalıştırılabilir dosya otomatik veritabanı migrasyonu gerçekleştirmez ve doğrudan üzerine yazma durumunda eski verileriniz veya ayarlarınız sıfırlanabilir.
 
 ---
 
@@ -436,7 +454,8 @@ Bu bölüm uygulamayı ilk kez çalıştıran kullanıcılar için temel kullan�
 5. LLM kullanacaksanız sağlayıcı ve model ayarını yapın; kullanmayacaksanız `none`/pasif durumda bırakın.
 6. İhtiyaç varsa özel LLM süzgeçleri oluşturun.
 7. E-posta veya Telegram bildirimlerini yapılandırın.
-8. **Aktif İhaleler** ekranından manuel taramayı başlatın.
+8. **Otomatik Tarama:** Uygulama açıldığında otomatik tarama arka planda kendiliğinden başlatılır.
+9. **Manuel Tarama:** İhtiyaç duyduğunuzda, **Aktif İhaleler** ekranından manuel tarama butonunu kullanarak anlık ek tarama tetikleyebilirsiniz.
 9. Beklenmeyen sonuç veya kaynak hatalarında **Sistem Logları** ekranını kontrol edin.
 
 ## 1. İlk Kurulum Sihirbazı
@@ -481,7 +500,7 @@ Başlıca ayarlar:
 - sağlayıcı modeli ve API anahtarı;
 - arayüz teması.
 
-LLM anahtarı girmeden de küresel ve sektörel yerel filtreler kullanılabilir. LLM devre dışı olduğunda yalnız semantik/fallback değerlendirmeler atlanır.
+LLM anahtarı girmeden de küresel ve sektörel yerel filtreler kullanılabilir. LLM devre dışı olduğunda özel semantik süzgeçler çalıştırılmaz; yerel sektör sınıflandırması çalışmaya devam eder.
 
 ![Genel Ayarlar](screenshots/config_general.png)
 
@@ -631,7 +650,7 @@ http://127.0.0.1:8085
 4. Küresel yasaklı kelimeler çok geniş mi?
 5. Sektör pozitif kelimeleri aşırı dar mı?
 6. `events.log` veya Sistem Logları kaynak/parsing hatası gösteriyor mu?
-7. Test edilen kaynak EKAP mı? EKAP şu anda kayıt üretmez.
+7. Test edilen kaynak EKAP mı? İlk EKAP taraması mevcut açık ihaleleri topladığı için sonraki taramalardan daha uzun sürebilir. Sonraki taramalar son başarılı tarama tarihinden itibaren artımlı (incremental) çalışır.
 
 ## Bir Kaynak Çalışıyor, Diğeri Çalışmıyor
 
@@ -639,17 +658,18 @@ Bu çoğunlukla kaynak portalın HTML/API yapısının değiştiğini veya geçi
 
 Hata bildirirken kaynak adını ve kişisel veri içermeyen log satırlarını ekleyin.
 
-## LLM Sınıflandırması Çalışmıyor
+## Özel LLM Süzgeçleri Çalışmıyor
 
 - aktif sağlayıcının doğru seçildiğini;
 - API anahtarının geçerli olduğunu;
 - seçilen modelin sağlayıcı hesabınızda kullanılabildiğini;
 - kota veya rate-limit hatası bulunmadığını;
-- custom filter hedef sektörünün doğru olduğunu
+- custom filter hedef sektörünün doğru olduğunu;
+- ihalenin yerel kurallarla bir sektöre atanmış olduğunu (süzgeçler yalnız sektöre atanmış ihalelerde çalışır)
 
 kontrol edin.
 
-LLM çağrısı başarısız olsa bile yerel kural tabanlı sınıflandırma kullanılabilir.
+Özel LLM süzgeci veya bağlantısı başarısız olsa veya devre dışı bırakılsa bile yerel kural tabanlı sınıflandırma ve dashboard kayıtları çalışmaya devam eder.
 
 ## E-posta Gelmiyor
 
