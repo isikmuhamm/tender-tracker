@@ -5,6 +5,7 @@ import yaml
 import logging
 import urllib3
 from typing import Optional
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, HTTPException, status, Header
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.staticfiles import StaticFiles
@@ -65,7 +66,7 @@ if not any(isinstance(h, logging.StreamHandler) and not isinstance(h, logging.Fi
     console_handler.setLevel(logging.INFO)
     logger.addHandler(console_handler)
 
-app = FastAPI(title="Tender Tracker API", version="1.3.2")
+
 
 def run_startup_scan():
     """Uygulama başladığında otomatik taramayı arka planda başlatır."""
@@ -100,9 +101,12 @@ def run_startup_scan():
             
     threading.Thread(target=run_scraper_bg, daemon=True).start()
 
-@app.on_event("startup")
-def startup_event():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     run_startup_scan()
+    yield
+
+app = FastAPI(title="Tender Tracker API", version="1.3.2", lifespan=lifespan)
 
 def get_resource_path(relative_path):
     """PyInstaller geçici klasöründeki veya çalışma dizinindeki dosya yolunu çözümler."""
